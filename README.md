@@ -14,6 +14,18 @@ Key Features:
 [Feature 3]: [What it does + why it matters].
 
 ## 🚀 Quick Start & Demo Path
+
+Development
+1. npm install
+2. npm run build
+3. npm run watch
+4. Open Command Palette
+5. Select 'Debug: Select and Start Debugging' - this should open anotheer VSCode window
+6. Make sure the new window has a Node.js project
+7. Select 'Start Scanner' under the 'Vulnerable Packages' view under 'Explorer'
+8. This should open the canvas!
+
+
 Installation (1 Command)
 Requirements: [e.g., Node 18+, Python 3.9+, API keys].
 Bash

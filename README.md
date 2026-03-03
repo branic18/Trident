@@ -20,10 +20,11 @@ Development
 2. npm run build
 3. npm run watch
 4. Open Command Palette
-5. Select 'Debug: Select and Start Debugging' - this should open anotheer VSCode window
-6. Make sure the new window has a Node.js project
-7. Select 'Start Scanner' under the 'Vulnerable Packages' view under 'Explorer'
-8. This should open the canvas!
+5. Select 'Debug: Select and Start Debugging'
+6. Select 'Run Extenstion'- this should open anotheer VSCode window
+7. Make sure the new window has a Node.js project
+8. Select 'Start Scanner' under the 'Vulnerable Packages' view under 'Explorer'
+9. This should open the canvas!
 
 
 Installation (1 Command)

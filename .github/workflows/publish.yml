@@ -1,9 +1,14 @@
 name: Publish VSCode Extension
 
+# on:
+#   push:
+#     tags:
+#       - "v*"
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_run:
+    workflows: ["Release Please"]
+    types:
+      - completed
 
 jobs:
   publish:

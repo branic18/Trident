@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.4](https://github.com/branic18/Trident/compare/v1.1.3...v1.1.4) (2026-03-06)
+
+
+### Bug Fixes
+
+* upgraded eslint ([c5fedc6](https://github.com/branic18/Trident/commit/c5fedc6472d34afd0ee41b0fc3485206233b8dce))
+
 ## [1.1.3](https://github.com/branic18/Trident/compare/v1.1.2...v1.1.3) (2026-03-06)
 
 

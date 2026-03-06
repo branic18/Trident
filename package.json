@@ -1,6 +1,6 @@
 {
   "name": "trident-vulnerability-package-scanner",
-  "displayName": "Trident",
+  "displayName": "Trident Vulnerability Package Scanner",
   "publisher": "trident-team",
   "version": "1.0.0",
   "engines": {

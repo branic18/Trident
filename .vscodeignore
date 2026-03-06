@@ -1,0 +1,8 @@
+.vscode/**
+docs/**
+src/**
+.gitignore
+.github/**
+tsconfig.json
+eslint.config.js
+node_modules/**

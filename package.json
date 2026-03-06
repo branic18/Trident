@@ -15,8 +15,17 @@
     "compile": "tsc -p ./",
     "lint": "eslint src --ext ts"
   },
-  "categories": ["Other", "Visualization"],
-  "keywords": ["security", "npm", "dependency", "vulnerability", "audit"],
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "keywords": [
+    "security",
+    "npm",
+    "dependency",
+    "vulnerability",
+    "audit"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
@@ -25,7 +34,7 @@
     "onCommand:vulnerability-scanner.showLogs"
   ],
   "contributes": {
-     "views": {
+    "views": {
       "explorer": [
         {
           "id": "vulnerabilityView",
@@ -50,7 +59,7 @@
   },
   "devDependencies": {
     "@types/node": "^25.3.3",
-    "@types/vscode": "^1.109.0"
+    "@types/vscode": "^1.109.0",
+    "eslint": "^10.0.2"
   }
 }
-

@@ -2,7 +2,7 @@
   "name": "trident",
   "displayName": "Trident",
   "publisher": "trident-team",
-  "version": "0.0.1",
+  "version": "1.0.0",
   "engines": {
     "vscode": "^1.109.0"
   },
@@ -15,8 +15,17 @@
     "compile": "tsc -p ./",
     "lint": "eslint src --ext ts"
   },
-  "categories": ["Other", "Visualization"],
-  "keywords": ["security", "npm", "dependency", "vulnerability", "audit"],
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "keywords": [
+    "security",
+    "npm",
+    "dependency",
+    "vulnerability",
+    "audit"
+  ],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
@@ -25,7 +34,7 @@
     "onCommand:vulnerability-scanner.showLogs"
   ],
   "contributes": {
-     "views": {
+    "views": {
       "explorer": [
         {
           "id": "vulnerabilityView",

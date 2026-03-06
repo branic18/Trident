@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.3](https://github.com/branic18/Trident/compare/v1.1.2...v1.1.3) (2026-03-06)
+
+
+### Bug Fixes
+
+* add eslint file for CI ([ac3c2c6](https://github.com/branic18/Trident/commit/ac3c2c6c51a1ed08bb20fd260bf3a2ac7ba13d3b))
+
 ## [1.1.2](https://github.com/branic18/Trident/compare/v1.1.1...v1.1.2) (2026-03-06)
 
 

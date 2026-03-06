@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.1.1](https://github.com/branic18/Trident/compare/v1.1.0...v1.1.1) (2026-03-06)
+
+
+### Bug Fixes
+
+* trigger publish workflow 4 ([2105b8b](https://github.com/branic18/Trident/commit/2105b8bfd3d0b192187a8376285fc8b7b376bf7c))
+* trigger publish workflow 5 ([70745b4](https://github.com/branic18/Trident/commit/70745b4f8143ee20692a8ba3cf2b0dde6e71280f))
+* trigger publish workflow 6 ([37f7334](https://github.com/branic18/Trident/commit/37f733499a154e5f74a2e45a1df400ad544b48a2))
+
 ## [1.1.0](https://github.com/branic18/Trident/compare/v1.0.2...v1.1.0) (2026-03-06)
 
 

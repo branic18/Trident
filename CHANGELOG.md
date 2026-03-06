@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.5](https://github.com/branic18/Trident/compare/v1.1.4...v1.1.5) (2026-03-06)
+
+
+### Bug Fixes
+
+* Resolved ESLint Errors from publish workflow ([c4d7776](https://github.com/branic18/Trident/commit/c4d77769df05004de7dea31352f967ee1bf699b8))
+
 ## [1.1.4](https://github.com/branic18/Trident/compare/v1.1.3...v1.1.4) (2026-03-06)
 
 

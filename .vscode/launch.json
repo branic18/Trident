@@ -6,9 +6,9 @@
       "request": "launch",
       "name": "Run Extension",
       "outFiles": [
-        "${workspaceFolder}/vulnerability-scanner/out/**/*.js"
+        "${workspaceFolder}/out/**/*.js"
       ],
-      "preLaunchTask": "npm: watch - vulnerability-scanner"
+      "preLaunchTask": "npm: watch"
     }
   ]
 }

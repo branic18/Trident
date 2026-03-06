@@ -2,12 +2,9 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "npm: watch - vulnerability-scanner",
+      "label": "npm: watch",
       "type": "shell",
       "command": "npm run watch",
-      "options": {
-        "cwd": "${workspaceFolder}/vulnerability-scanner"
-      },
       "isBackground": true,
       "problemMatcher": [
         "$tsc-watch"

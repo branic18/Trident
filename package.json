@@ -28,7 +28,7 @@
   ],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "activationEvents": [
     "onCommand:vulnerability-scanner.scan",
     "onCommand:vulnerability-scanner.showLogs"
@@ -58,10 +58,12 @@
     "typescript": "^5.9.3"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.3",
     "@types/node": "^25.3.3",
     "@types/vscode": "^1.109.0",
     "@typescript-eslint/eslint-plugin": "^8.56.1",
     "@typescript-eslint/parser": "^8.56.1",
-    "eslint": "^v9.0.0"
+    "eslint": "^9.39.3",
+    "typescript-eslint": "^8.56.1"
   }
 }

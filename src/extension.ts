@@ -286,6 +286,9 @@ async function runNpmAudit(panel: vscode.WebviewPanel, projectRoot: string): Pro
     panel.webview.html = getWebviewContent(panel.webview);
 
     try {
+        if (!hasLockfile(projectRoot)) {
+            panel.webview.postMessage({ command: 'loadStatus', status: 'Creating lockfile...' });
+        }
         const auditResults = await runAuditWithLockfileFallback(projectRoot);
         const auditError = getAuditError(auditResults);
         if (auditError) {
@@ -863,7 +866,23 @@ export async function onVulnSelected(vuln: VulnerabilitySelection) {
     }
 }
 
+function hasLockfile(projectRoot: string): boolean {
+    const lockPaths = [
+        path.join(projectRoot, 'package-lock.json'),
+        path.join(projectRoot, 'yarn.lock'),
+        path.join(projectRoot, 'pnpm-lock.yaml')
+    ];
+    return lockPaths.some(p => fs.existsSync(p));
+}
+
+async function ensureLockfileExists(projectRoot: string): Promise<void> {
+    if (hasLockfile(projectRoot)) return;
+    vscode.window.showInformationMessage('No lockfile found. Creating package-lock.json...');
+    await execAsync('npm i --package-lock-only --ignore-scripts', { cwd: projectRoot });
+}
+
 async function runAuditWithLockfileFallback(projectRoot: string): Promise<unknown> {
+    await ensureLockfileExists(projectRoot);
     try {
         return await runAudit(projectRoot);
     } catch (error) {
@@ -876,7 +895,7 @@ async function runAuditWithLockfileFallback(projectRoot: string): Promise<unknow
             throw error;
         }
 
-        // If the project has no lockfile, create one and retry
+        // Retry: create lockfile and run audit again
         vscode.window.showInformationMessage(
             'No lockfile found. Creating package-lock.json...'
         );
@@ -988,6 +1007,7 @@ function getWebviewContent(webview: vscode.Webview): string {
         #inspector-panel .dep-type { color: #BBBBBB; font-size: 14px; margin-bottom: 8px; }
         #inspector-panel .package-name { font-family: 'IBM Plex Sans', sans-serif; font-size: 32px; font-weight: 400; margin-bottom: 16px; }
         #inspector-panel .vul-section { margin: 16px 0; padding-top: 12px; border-top: 1px solid rgba(247,247,247,0.5); }
+        #inspector-panel .vul-section.severity-inspector-vul-section { border-top: none; padding-top: 0; }
         #inspector-panel .vul-title { font-weight: bold; font-size: 20px; margin-bottom: 8px; }
         #inspector-panel .vul-summary { font-size: 15px; color: #BBBBBB; margin: 8px 0; max-height: 4.5em; overflow: hidden; }
         #inspector-panel .severity-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 12px 0; }
@@ -1000,8 +1020,13 @@ function getWebviewContent(webview: vscode.Webview): string {
         #inspector-panel .copy-cmd.view-details-cmd { font-family: 'IBM Plex Sans', sans-serif; }
         #inspector-panel .copy-cmd a { color: #0678CF; text-decoration: none; }
         #inspector-panel .copy-cmd a:hover { text-decoration: underline; }
-        #inspector-panel .copy-cmd .copy-success-icon { color: #22c55e; }
+        #inspector-panel .copy-cmd i,
+        .copy-after-btn i,
+        .action-item i { min-width: 1.2em; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        #inspector-panel .copy-cmd .copy-success-icon,
+        .copy-success-icon { color: #000000 !important; background: #22c55e; border-radius: 50%; padding: 2px; display: inline-flex; align-items: center; justify-content: center; min-width: 1.2em; width: 1.2em; }
         .view-details-link { font-size: 15px; color: #BBBBBB; cursor: pointer; text-decoration: none; }
+        .view-details-link:hover { text-decoration: underline; }
         .severity-info-row { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0; font-size: 15px; color: #BBBBBB; }
         .severity-info-row i { margin-top: 2px; flex-shrink: 0; }
         .severity-info-row a { color: #0678CF; text-decoration: none; }
@@ -1439,7 +1464,12 @@ function getWebviewContent(webview: vscode.Webview): string {
     </head>
     <body>
       <div id="app">
-        <div id="graph-container"></div>
+        <div id="graph-container">
+          <div id="loading-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;color:#BBBBBB;">
+            <i class="bi bi-hourglass-split" style="font-size:32px;"></i>
+            <span style="font-size:16px;">Scanning packages...</span>
+          </div>
+        </div>
         <div id="metadata-panel"></div>
         <div id="goose-onboarding" class="hidden">
           <div><strong>Goose Tips</strong></div>
@@ -1506,24 +1536,48 @@ function getWebviewContent(webview: vscode.Webview): string {
 
         window.addEventListener('message', event => {
           const msg = event.data;
-          if (msg.command === 'loadData') renderVisualization(msg.data);
+          if (msg.command === 'loadStatus' && msg.status) {
+            const loadingText = document.querySelector('#loading-state span');
+            if (loadingText) loadingText.textContent = msg.status;
+          }
+          else if (msg.command === 'loadData') {
+            const loadingEl = document.getElementById('loading-state');
+            if (loadingEl) loadingEl.remove();
+            try {
+              if (typeof d3 !== 'undefined') {
+                renderVisualization(msg.data);
+              } else {
+                document.getElementById('app').innerHTML = '<p style="color:#F16621;padding:20px;">Failed to load visualization (D3 not available). Please reload the scanner.</p>';
+              }
+            } catch (err) {
+              const errMsg = err instanceof Error ? err.message : String(err);
+              document.getElementById('app').innerHTML = '<p style="color:#F16621;padding:20px;">Visualization error: ' + escapeHtml(errMsg) + '</p>';
+            }
+          }
           else if (msg.command === 'loadError') {
+            const loadingEl = document.getElementById('loading-state');
+            if (loadingEl) loadingEl.remove();
             document.getElementById('app').innerHTML = '<p style="color:#F16621;padding:20px;">Scan failed: ' + (msg.error || 'Unknown') + '</p>';
           }
           else if (msg.type === 'gooseInsight') handleGooseInsight(msg.vulnId, msg.data);
           else if (msg.type === 'gooseInsightError') handleGooseInsightError(msg.vulnId, msg.error);
         });
 
+        function showCopyFeedback(containerEl) {
+          if (!containerEl) return;
+          const icon = containerEl.querySelector('i.bi-clipboard') || containerEl.querySelector('i[class*="clipboard"]') || containerEl.querySelector('i');
+          if (icon) {
+            const origClass = typeof icon.className === 'string' ? icon.className : (icon.className.baseVal || 'bi bi-clipboard');
+            icon.className = 'bi bi-check copy-success-icon';
+            setTimeout(() => { icon.className = origClass; }, 1200);
+          }
+        }
+
         function copyWithFeedback(el) {
           const cmd = el.dataset.cmd;
           if (!cmd) return;
           navigator.clipboard.writeText(cmd);
-          const icon = el.querySelector('i');
-          if (icon) {
-            const origClass = icon.className;
-            icon.className = 'bi bi-check copy-success-icon';
-            setTimeout(() => { icon.className = origClass; }, 1500);
-          }
+          showCopyFeedback(el);
         }
 
         function renderVisualization(data) {
@@ -1621,10 +1675,10 @@ function getWebviewContent(webview: vscode.Webview): string {
           const pkgWord = packages.length === 1 ? 'Package' : 'Packages';
           let html = '<div class="dep-type">Vulnerabilities</div>';
           html += '<div class="package-name">' + packages.length + ' ' + sevCap + ' Severity ' + pkgWord + '</div>';
-          html += '<div style="font-size:15px;color:#F7F7F7;margin-bottom:12px;line-height:1.5;">' + escapeHtml(cvssCopy) + '</div>';
+          html += '<div style="font-size:15px;color:#F7F7F7;margin-bottom:50px;line-height:1.5;">' + escapeHtml(cvssCopy) + '</div>';
           html += '<hr style="border:none;border-top:1px solid #555;margin:12px 0;" />';
           html += '<div class="severity-info-row"><i class="bi bi-info-circle"></i><span>Order is based on highest <a href="https://www.first.org/cvss/" target="_blank" class="severity-info-link">CVSS score</a> and total number of vulnerabilities.</span></div>';
-          html += '<div class="vul-section">';
+          html += '<div class="vul-section severity-inspector-vul-section">';
           packages.sort((a, b) => {
             let scoreA = 0, scoreB = 0;
             (a.data.via || []).forEach(v => { if (v && v.cvss && v.cvss.score) scoreA = Math.max(scoreA, v.cvss.score); });
@@ -1641,14 +1695,14 @@ function getWebviewContent(webview: vscode.Webview): string {
             html += '<div style="border:1px solid rgba(247,247,247,0.35);padding:12px;margin:8px 0;border-radius:4px;">';
             html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">';
             html += '<span class="package-name severity-pkg-name" style="margin-bottom:0;">' + escapeHtml(p.name) + '</span>';
-            html += '<span class="view-details-link" data-pkg="' + escapeHtml(p.name) + '" data-severity="' + severity + '" onclick="selectNodeFromSeverity(this.getAttribute(\\'data-pkg\\'), this.getAttribute(\\'data-severity\\'))">View details</span>';
+            html += '<span class="view-details-link" data-action="view-package-details" data-pkg="' + escapeHtml(p.name) + '" data-severity="' + severity + '">View details</span>';
             html += '</div>';
             html += '<div class="remediation"><div class="remediation-col"><div class="remediation-line">Dependencies: ' + depCount + '</div><div class="remediation-line">Upgrade To: ' + (upgradeTo || '-') + '</div></div>';
             html += '<div class="remediation-col"><div class="remediation-line">Type: ' + (fix && fix.isSemVerMajor ? 'SemVer Major' : 'SemVer') + '</div><div class="remediation-line">Resolves: ' + (fix && fix.resolves ? fix.resolves.length + ' vulnerabilities' : '-') + '</div></div>';
             if (fixCmd) {
-              html += '<div class="copy-cmd" data-cmd="' + fixCmd.replace(/"/g, '&quot;') + '" onclick="copyWithFeedback(this)"><span>' + escapeHtml(fixCmd) + '</span><i class="bi bi-clipboard"></i></div>';
+              html += '<div class="copy-cmd" data-action="copy-cmd" data-cmd="' + fixCmd.replace(/"/g, '&quot;') + '"><span>' + escapeHtml(fixCmd) + '</span><i class="bi bi-clipboard"></i></div>';
             } else {
-              html += '<div class="copy-cmd view-details-cmd" data-pkg="' + escapeHtml(p.name) + '" data-severity="' + severity + '" onclick="selectNodeFromSeverity(this.getAttribute(\\'data-pkg\\'), this.getAttribute(\\'data-severity\\'))"><span>See advisory</span><i class="bi bi-box-arrow-up-right"></i></div>';
+              html += '<div class="copy-cmd view-details-cmd" data-action="view-package-details" data-pkg="' + escapeHtml(p.name) + '" data-severity="' + severity + '"><span>See advisory</span><i class="bi bi-box-arrow-up-right"></i></div>';
             }
             html += '</div></div>';
           });
@@ -1991,7 +2045,7 @@ function getWebviewContent(webview: vscode.Webview): string {
               html += '<div class="remediation"><div class="remediation-col"><div class="remediation-line">Fix Available: ' + (fix ? 'Yes' : 'No') + '</div><div class="remediation-line">Upgrade To: ' + (upgradeTo || '-') + '</div></div>';
               html += '<div class="remediation-col"><div class="remediation-line">Type: ' + (fix && fix.isSemVerMajor ? 'SemVer Major' : 'SemVer') + '</div><div class="remediation-line">Resolves: ' + (fix && fix.resolves ? fix.resolves.length + ' vulnerabilities' : '-') + '</div></div>';
               if (fixCmd) {
-                html += '<div class="copy-cmd" data-cmd="' + fixCmd.replace(/"/g, '&quot;') + '" onclick="copyWithFeedback(this)"><span>' + escapeHtml(fixCmd) + '</span><i class="bi bi-clipboard"></i></div>';
+                html += '<div class="copy-cmd" data-action="copy-cmd" data-cmd="' + fixCmd.replace(/"/g, '&quot;') + '"><span>' + escapeHtml(fixCmd) + '</span><i class="bi bi-clipboard"></i></div>';
               } else {
                 html += '<div class="copy-cmd"><a href="' + escapeHtml(advUrl) + '" target="_blank" rel="noopener" style="color:#0678CF;text-decoration:none;">See advisory</a><i class="bi bi-box-arrow-up-right"></i></div>';
               }
@@ -2412,6 +2466,13 @@ function getWebviewContent(webview: vscode.Webview): string {
               if (pkg) selectNodeByName(pkg);
               break;
             }
+            case 'view-package-details': {
+              event.preventDefault();
+              const pkg = target.getAttribute('data-pkg');
+              const sev = target.getAttribute('data-severity');
+              if (pkg && sev) selectNodeFromSeverity(pkg, sev);
+              break;
+            }
             case 'toggle-accordion': {
               const targetId = target.getAttribute('data-target');
               const body = targetId ? document.getElementById(targetId) : null;
@@ -2422,7 +2483,7 @@ function getWebviewContent(webview: vscode.Webview): string {
             }
             case 'copy-cmd': {
               const cmd = target.getAttribute('data-cmd');
-              if (cmd) navigator.clipboard.writeText(cmd);
+              if (cmd) { navigator.clipboard.writeText(cmd); showCopyFeedback(target); }
               break;
             }
             case 'goose-cancel': {
@@ -2431,7 +2492,7 @@ function getWebviewContent(webview: vscode.Webview): string {
             }
             case 'copy-action': {
               const text = target.getAttribute('data-action-text');
-              if (text) copyAction(text);
+              if (text) { copyAction(text); showCopyFeedback(target); }
               break;
             }
             case 'goose-feedback': {
@@ -2441,6 +2502,7 @@ function getWebviewContent(webview: vscode.Webview): string {
             }
             case 'copy-after': {
               copyCodeFixAfter();
+              showCopyFeedback(target);
               break;
             }
             case 'apply-fix': {

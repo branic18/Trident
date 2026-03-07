@@ -1,13 +1,4 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.buildVulnContext = buildVulnContext;
 exports.buildVulnContextSync = buildVulnContextSync;
@@ -85,70 +76,72 @@ function sanitizeVulnContext(context) {
         codeSnippet: (0, security_1.sanitizeCodeSnippet)(context.codeSnippet)
     };
 }
-function buildVulnContext(args) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const parsedCvss = parseCvssVector(args.cvssVector);
-        // Build initial context (before sanitization to allow file analysis)
-        let usedInFiles = args.usedInFiles || [];
-        let codeSnippet = args.codeSnippet;
-        let environment = args.environment;
-        if (args.projectRoot && (!args.usedInFiles || args.usedInFiles.length === 0)) {
-            try {
-                // Find files that actually use this package
-                usedInFiles = yield (0, fileAnalysis_1.findFilesUsingPackage)(args.pkgName, args.projectRoot);
-                // Extract code snippet from the first relevant file
-                if (usedInFiles.length > 0 && !codeSnippet) {
-                    // Prioritize non-config files for code snippets
-                    const codeFiles = usedInFiles.filter(file => !file.includes('config') &&
-                        !file.includes('package.json') &&
-                        (file.endsWith('.js') || file.endsWith('.ts') || file.endsWith('.jsx') || file.endsWith('.tsx')));
-                    const targetFile = codeFiles.length > 0 ? codeFiles[0] : usedInFiles[0];
-                    codeSnippet = yield (0, fileAnalysis_1.extractCodeSnippet)(targetFile, args.pkgName, args.projectRoot);
-                }
-                // Detect environment if not provided
-                if (!environment) {
-                    environment = (0, fileAnalysis_1.detectEnvironment)(args.pkgName, args.paths, args.projectRoot);
-                }
+async function buildVulnContext(args) {
+    const parsedCvss = parseCvssVector(args.cvssVector);
+    // Build initial context (before sanitization to allow file analysis)
+    let usedInFiles = args.usedInFiles || [];
+    let codeSnippet = args.codeSnippet;
+    let environment = args.environment;
+    if (args.projectRoot && (!args.usedInFiles || args.usedInFiles.length === 0)) {
+        try {
+            // Find files that actually use this package
+            usedInFiles = await (0, fileAnalysis_1.findFilesUsingPackage)(args.pkgName, args.projectRoot);
+            // Extract code snippet from the first relevant file
+            if (usedInFiles.length > 0 && !codeSnippet) {
+                // Prioritize non-config files for code snippets
+                const codeFiles = usedInFiles.filter(file => !file.includes('config') &&
+                    !file.includes('package.json') &&
+                    (file.endsWith('.js') || file.endsWith('.ts') || file.endsWith('.jsx') || file.endsWith('.tsx')));
+                const targetFile = codeFiles.length > 0 ? codeFiles[0] : usedInFiles[0];
+                codeSnippet = await (0, fileAnalysis_1.extractCodeSnippet)(targetFile, args.pkgName, args.projectRoot);
             }
-            catch (error) {
-                console.error('Error during file analysis:', error);
-                // Continue with provided data if file analysis fails
+            // Detect environment if not provided
+            if (!environment) {
+                environment = (0, fileAnalysis_1.detectEnvironment)(args.pkgName, args.paths, args.projectRoot);
             }
         }
-        // Default environment if still not determined
-        if (!environment) {
-            environment = 'prod'; // Conservative default for security prioritization
+        catch (error) {
+            console.error('Error during file analysis:', error);
+            // Continue with provided data if file analysis fails
         }
-        // Build the context object
-        const context = {
-            vulnId: args.vulnId,
-            packageName: args.pkgName,
-            version: args.pkgVersion,
-            npmSeverity: args.npmSeverity,
-            cvss: Object.assign({ score: args.cvssScore, vectorString: args.cvssVector }, (parsedCvss && { parsed: parsedCvss })),
-            cwe: (args.cweIds && args.cweIds.length) || (args.cweNames && args.cweNames.length)
-                ? {
-                    ids: args.cweIds || [],
-                    names: args.cweNames || []
-                }
-                : undefined,
-            githubAdvisory: (args.githubAdvisoryId || args.githubSummary || args.githubUrl)
-                ? {
-                    id: args.githubAdvisoryId,
-                    summary: args.githubSummary,
-                    url: args.githubUrl,
-                }
-                : undefined,
-            paths: args.paths || [],
-            usedInFiles: usedInFiles,
-            environment: environment,
-            projectType: args.projectType,
-            fixAvailable: args.fixInfo,
-            codeSnippet: codeSnippet,
-        };
-        // Apply comprehensive security sanitization
-        return sanitizeVulnContext(context);
-    });
+    }
+    // Default environment if still not determined
+    if (!environment) {
+        environment = 'prod'; // Conservative default for security prioritization
+    }
+    // Build the context object
+    const context = {
+        vulnId: args.vulnId,
+        packageName: args.pkgName,
+        version: args.pkgVersion,
+        npmSeverity: args.npmSeverity,
+        cvss: {
+            score: args.cvssScore,
+            vectorString: args.cvssVector,
+            ...(parsedCvss && { parsed: parsedCvss })
+        },
+        cwe: (args.cweIds && args.cweIds.length) || (args.cweNames && args.cweNames.length)
+            ? {
+                ids: args.cweIds || [],
+                names: args.cweNames || []
+            }
+            : undefined,
+        githubAdvisory: (args.githubAdvisoryId || args.githubSummary || args.githubUrl)
+            ? {
+                id: args.githubAdvisoryId,
+                summary: args.githubSummary,
+                url: args.githubUrl,
+            }
+            : undefined,
+        paths: args.paths || [],
+        usedInFiles: usedInFiles,
+        environment: environment,
+        projectType: args.projectType,
+        fixAvailable: args.fixInfo,
+        codeSnippet: codeSnippet,
+    };
+    // Apply comprehensive security sanitization
+    return sanitizeVulnContext(context);
 }
 // Legacy synchronous version for backward compatibility
 function buildVulnContextSync(args) {
@@ -158,7 +151,11 @@ function buildVulnContextSync(args) {
         packageName: args.pkgName,
         version: args.pkgVersion,
         npmSeverity: args.npmSeverity,
-        cvss: Object.assign({ score: args.cvssScore, vectorString: args.cvssVector }, (parsedCvss && { parsed: parsedCvss })),
+        cvss: {
+            score: args.cvssScore,
+            vectorString: args.cvssVector,
+            ...(parsedCvss && { parsed: parsedCvss })
+        },
         cwe: (args.cweIds && args.cweIds.length) || (args.cweNames && args.cweNames.length)
             ? {
                 ids: args.cweIds || [],

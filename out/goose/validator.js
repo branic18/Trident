@@ -189,7 +189,7 @@ class JsonSchemaValidator {
         });
     }
     filterSuspiciousContent(insight) {
-        const filtered = Object.assign({}, insight);
+        const filtered = { ...insight };
         // Filter potentially dangerous content
         filtered.title = this.filterText(filtered.title);
         filtered.humanExplanation = this.filterText(filtered.humanExplanation);
@@ -198,7 +198,11 @@ class JsonSchemaValidator {
         filtered.devFacingSummary = this.filterText(filtered.devFacingSummary);
         filtered.recommendedActions = filtered.recommendedActions.map(action => this.filterText(action));
         if (filtered.codeFix) {
-            filtered.codeFix = Object.assign(Object.assign({}, filtered.codeFix), { description: this.filterText(filtered.codeFix.description), warnings: filtered.codeFix.warnings.map(warning => this.filterText(warning)) });
+            filtered.codeFix = {
+                ...filtered.codeFix,
+                description: this.filterText(filtered.codeFix.description),
+                warnings: filtered.codeFix.warnings.map(warning => this.filterText(warning))
+            };
         }
         return filtered;
     }

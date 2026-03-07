@@ -1,19 +1,43 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.findFilesUsingPackage = findFilesUsingPackage;
 exports.extractCodeSnippet = extractCodeSnippet;
 exports.detectEnvironment = detectEnvironment;
-const path = require("path");
-const fs = require("fs");
+const path = __importStar(require("path"));
+const fs = __importStar(require("fs"));
 const util_1 = require("util");
 const child_process_1 = require("child_process");
 const security_1 = require("./security");
@@ -24,184 +48,175 @@ const existsAsync = (0, util_1.promisify)(fs.exists);
  * Analyzes project files to find actual usage of a vulnerable package
  * Returns file paths where the package is imported/required/used
  */
-function findFilesUsingPackage(packageName, projectRoot) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const usedInFiles = [];
-        try {
-            // Use ripgrep to find import/require statements efficiently
-            const patterns = [
-                `import.*from.*['"\`]${packageName}['"\`]`,
-                `import.*['"\`]${packageName}['"\`]`,
-                `require\\(['"\`]${packageName}['"\`]\\)`,
-                `from.*['"\`]${packageName}['"\`]`,
-                // Dynamic imports
-                `import\\(['"\`]${packageName}['"\`]\\)`,
-                // Package usage in package.json and config files
-                `['"\`]${packageName}['"\`]\\s*:`
-            ];
-            for (const pattern of patterns) {
-                try {
-                    const { stdout } = yield execAsync(`rg -l --type js --type ts --type jsx --type tsx --type json --type yaml --type yml "${pattern}" "${projectRoot}"`, { timeout: 5000 });
-                    if (stdout.trim()) {
-                        const files = stdout.trim().split('\n')
-                            .filter(file => (0, security_1.isPathWithinRoot)(file, projectRoot))
-                            .map(file => path.relative(projectRoot, file))
-                            .filter(file => !file.includes('node_modules'))
-                            .filter(file => !file.includes('.git'));
-                        usedInFiles.push(...files);
-                    }
-                }
-                catch (_a) {
-                    // Continue with other patterns if one fails
-                    continue;
+async function findFilesUsingPackage(packageName, projectRoot) {
+    const usedInFiles = [];
+    try {
+        // Use ripgrep to find import/require statements efficiently
+        const patterns = [
+            `import.*from.*['"\`]${packageName}['"\`]`,
+            `import.*['"\`]${packageName}['"\`]`,
+            `require\\(['"\`]${packageName}['"\`]\\)`,
+            `from.*['"\`]${packageName}['"\`]`,
+            // Dynamic imports
+            `import\\(['"\`]${packageName}['"\`]\\)`,
+            // Package usage in package.json and config files
+            `['"\`]${packageName}['"\`]\\s*:`
+        ];
+        for (const pattern of patterns) {
+            try {
+                const { stdout } = await execAsync(`rg -l --type js --type ts --type jsx --type tsx --type json --type yaml --type yml "${pattern}" "${projectRoot}"`, { timeout: 5000 });
+                if (stdout.trim()) {
+                    const files = stdout.trim().split('\n')
+                        .filter(file => (0, security_1.isPathWithinRoot)(file, projectRoot))
+                        .map(file => path.relative(projectRoot, file))
+                        .filter(file => !file.includes('node_modules'))
+                        .filter(file => !file.includes('.git'));
+                    usedInFiles.push(...files);
                 }
             }
-            // Also check package.json and common config files directly
-            yield checkConfigFiles(packageName, projectRoot, usedInFiles);
-            // Remove duplicates and return
-            return [...new Set(usedInFiles)].slice(0, 10); // Limit to 10 most relevant files
+            catch {
+                // Continue with other patterns if one fails
+                continue;
+            }
         }
-        catch (error) {
-            console.error(`Error finding files using package ${packageName}:`, error);
-            // Fallback: check common locations
-            return yield fallbackFileSearch(packageName, projectRoot);
-        }
-    });
+        // Also check package.json and common config files directly
+        await checkConfigFiles(packageName, projectRoot, usedInFiles);
+        // Remove duplicates and return
+        return [...new Set(usedInFiles)].slice(0, 10); // Limit to 10 most relevant files
+    }
+    catch (error) {
+        console.error(`Error finding files using package ${packageName}:`, error);
+        // Fallback: check common locations
+        return await fallbackFileSearch(packageName, projectRoot);
+    }
 }
 /**
  * Checks common configuration files for package usage
  */
-function checkConfigFiles(packageName, projectRoot, usedInFiles) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const configFiles = [
-            'package.json',
-            'webpack.config.js',
-            'webpack.config.ts',
-            'vite.config.js',
-            'vite.config.ts',
-            'rollup.config.js',
-            'rollup.config.ts',
-            'tsconfig.json',
-            '.eslintrc.js',
-            '.eslintrc.json',
-            'babel.config.js'
-        ];
-        for (const configFile of configFiles) {
-            const filePath = path.join(projectRoot, configFile);
-            if (!(0, security_1.isPathWithinRoot)(filePath, projectRoot)) {
-                console.warn(`Skipping config file outside project root: ${filePath}`);
+async function checkConfigFiles(packageName, projectRoot, usedInFiles) {
+    const configFiles = [
+        'package.json',
+        'webpack.config.js',
+        'webpack.config.ts',
+        'vite.config.js',
+        'vite.config.ts',
+        'rollup.config.js',
+        'rollup.config.ts',
+        'tsconfig.json',
+        '.eslintrc.js',
+        '.eslintrc.json',
+        'babel.config.js'
+    ];
+    for (const configFile of configFiles) {
+        const filePath = path.join(projectRoot, configFile);
+        if (!(0, security_1.isPathWithinRoot)(filePath, projectRoot)) {
+            console.warn(`Skipping config file outside project root: ${filePath}`);
+            continue;
+        }
+        if (await existsAsync(filePath)) {
+            try {
+                const content = await readFileAsync(filePath, 'utf8');
+                if (content.includes(packageName)) {
+                    usedInFiles.push(configFile);
+                }
+            }
+            catch {
+                // Continue if file can't be read
                 continue;
             }
-            if (yield existsAsync(filePath)) {
-                try {
-                    const content = yield readFileAsync(filePath, 'utf8');
-                    if (content.includes(packageName)) {
-                        usedInFiles.push(configFile);
-                    }
-                }
-                catch (_a) {
-                    // Continue if file can't be read
-                    continue;
-                }
-            }
         }
-    });
+    }
 }
 /**
  * Fallback search when ripgrep isn't available or fails
  */
-function fallbackFileSearch(packageName, projectRoot) {
-    return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b, _c;
-        const usedInFiles = [];
-        // Check if package is in dependencies
-        const packageJsonPath = path.join(projectRoot, 'package.json');
-        if (!(0, security_1.isPathWithinRoot)(packageJsonPath, projectRoot)) {
-            console.warn(`Skipping package.json outside project root: ${packageJsonPath}`);
-            return usedInFiles;
-        }
-        if (yield existsAsync(packageJsonPath)) {
-            try {
-                const packageJson = JSON.parse(yield readFileAsync(packageJsonPath, 'utf8'));
-                const isDependency = ((_a = packageJson.dependencies) === null || _a === void 0 ? void 0 : _a[packageName]) ||
-                    ((_b = packageJson.devDependencies) === null || _b === void 0 ? void 0 : _b[packageName]) ||
-                    ((_c = packageJson.peerDependencies) === null || _c === void 0 ? void 0 : _c[packageName]);
-                if (isDependency) {
-                    usedInFiles.push('package.json');
-                }
-            }
-            catch (_d) {
-                // Continue even if package.json can't be parsed
-            }
-        }
+async function fallbackFileSearch(packageName, projectRoot) {
+    const usedInFiles = [];
+    // Check if package is in dependencies
+    const packageJsonPath = path.join(projectRoot, 'package.json');
+    if (!(0, security_1.isPathWithinRoot)(packageJsonPath, projectRoot)) {
+        console.warn(`Skipping package.json outside project root: ${packageJsonPath}`);
         return usedInFiles;
-    });
+    }
+    if (await existsAsync(packageJsonPath)) {
+        try {
+            const packageJson = JSON.parse(await readFileAsync(packageJsonPath, 'utf8'));
+            const isDependency = packageJson.dependencies?.[packageName] ||
+                packageJson.devDependencies?.[packageName] ||
+                packageJson.peerDependencies?.[packageName];
+            if (isDependency) {
+                usedInFiles.push('package.json');
+            }
+        }
+        catch {
+            // Continue even if package.json can't be parsed
+        }
+    }
+    return usedInFiles;
 }
 /**
  * Extracts a code snippet around package usage for AI analysis
  * Returns ~10-20 lines of context around import/usage
  */
-function extractCodeSnippet(filePath, packageName, projectRoot) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            const fullPath = path.join(projectRoot, filePath);
-            if (!(0, security_1.isPathWithinRoot)(fullPath, projectRoot)) {
-                console.warn(`Skipping code snippet extraction outside project root: ${fullPath}`);
-                return undefined;
-            }
-            if (!(yield existsAsync(fullPath))) {
-                return undefined;
-            }
-            const content = yield readFileAsync(fullPath, 'utf8');
-            const lines = content.split('\n');
-            // Find line with package import/usage
-            let targetLine = -1;
-            const searchPatterns = [
-                new RegExp(`import.*from.*['"\`]${packageName}['"\`]`),
-                new RegExp(`import.*['"\`]${packageName}['"\`]`),
-                new RegExp(`require\\(['"\`]${packageName}['"\`]\\)`),
-                new RegExp(`from.*['"\`]${packageName}['"\`]`)
-            ];
-            for (let i = 0; i < lines.length; i++) {
-                for (const pattern of searchPatterns) {
-                    if (pattern.test(lines[i])) {
-                        targetLine = i;
-                        break;
-                    }
-                }
-                if (targetLine !== -1)
-                    break;
-            }
-            if (targetLine === -1) {
-                // No specific import found, return early lines if it's a config file
-                if (filePath.includes('config') || filePath.includes('package.json')) {
-                    const snippetLines = lines.slice(0, Math.min(15, lines.length));
-                    return {
-                        filePath: filePath,
-                        startLine: 1,
-                        endLine: snippetLines.length,
-                        before: sanitizeCodeSnippet(snippetLines.join('\n'))
-                    };
-                }
-                return undefined;
-            }
-            // Extract context around the target line
-            const contextLines = 8; // ~8 lines before and after
-            const startLine = Math.max(0, targetLine - contextLines);
-            const endLine = Math.min(lines.length - 1, targetLine + contextLines);
-            const snippetLines = lines.slice(startLine, endLine + 1);
-            return {
-                filePath: filePath,
-                startLine: startLine + 1, // 1-indexed for display
-                endLine: endLine + 1,
-                before: sanitizeCodeSnippet(snippetLines.join('\n'))
-            };
-        }
-        catch (error) {
-            console.error(`Error extracting code snippet from ${filePath}:`, error);
+async function extractCodeSnippet(filePath, packageName, projectRoot) {
+    try {
+        const fullPath = path.join(projectRoot, filePath);
+        if (!(0, security_1.isPathWithinRoot)(fullPath, projectRoot)) {
+            console.warn(`Skipping code snippet extraction outside project root: ${fullPath}`);
             return undefined;
         }
-    });
+        if (!await existsAsync(fullPath)) {
+            return undefined;
+        }
+        const content = await readFileAsync(fullPath, 'utf8');
+        const lines = content.split('\n');
+        // Find line with package import/usage
+        let targetLine = -1;
+        const searchPatterns = [
+            new RegExp(`import.*from.*['"\`]${packageName}['"\`]`),
+            new RegExp(`import.*['"\`]${packageName}['"\`]`),
+            new RegExp(`require\\(['"\`]${packageName}['"\`]\\)`),
+            new RegExp(`from.*['"\`]${packageName}['"\`]`)
+        ];
+        for (let i = 0; i < lines.length; i++) {
+            for (const pattern of searchPatterns) {
+                if (pattern.test(lines[i])) {
+                    targetLine = i;
+                    break;
+                }
+            }
+            if (targetLine !== -1)
+                break;
+        }
+        if (targetLine === -1) {
+            // No specific import found, return early lines if it's a config file
+            if (filePath.includes('config') || filePath.includes('package.json')) {
+                const snippetLines = lines.slice(0, Math.min(15, lines.length));
+                return {
+                    filePath: filePath,
+                    startLine: 1,
+                    endLine: snippetLines.length,
+                    before: sanitizeCodeSnippet(snippetLines.join('\n'))
+                };
+            }
+            return undefined;
+        }
+        // Extract context around the target line
+        const contextLines = 8; // ~8 lines before and after
+        const startLine = Math.max(0, targetLine - contextLines);
+        const endLine = Math.min(lines.length - 1, targetLine + contextLines);
+        const snippetLines = lines.slice(startLine, endLine + 1);
+        return {
+            filePath: filePath,
+            startLine: startLine + 1, // 1-indexed for display
+            endLine: endLine + 1,
+            before: sanitizeCodeSnippet(snippetLines.join('\n'))
+        };
+    }
+    catch (error) {
+        console.error(`Error extracting code snippet from ${filePath}:`, error);
+        return undefined;
+    }
 }
 /**
  * Sanitizes code snippet to remove potential secrets and limit size
@@ -223,18 +238,17 @@ function sanitizeCodeSnippet(code) {
  * Detects the environment context for a package based on dependency analysis
  */
 function detectEnvironment(packageName, paths, projectRoot) {
-    var _a, _b;
     try {
         // Check package.json to see if it's in devDependencies
         const packageJsonPath = path.join(projectRoot, 'package.json');
         if (fs.existsSync(packageJsonPath)) {
             const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
             // If explicitly in devDependencies, it's dev
-            if ((_a = packageJson.devDependencies) === null || _a === void 0 ? void 0 : _a[packageName]) {
+            if (packageJson.devDependencies?.[packageName]) {
                 return 'dev';
             }
             // If in regular dependencies, analyze further
-            if ((_b = packageJson.dependencies) === null || _b === void 0 ? void 0 : _b[packageName]) {
+            if (packageJson.dependencies?.[packageName]) {
                 // Analyze dependency paths to determine usage context
                 const buildToolPatterns = [
                     'webpack', 'vite', 'rollup', 'parcel', 'esbuild', 'babel',

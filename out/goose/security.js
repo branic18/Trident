@@ -1,13 +1,37 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.createSecureTempFile = createSecureTempFile;
 exports.securelyDeleteTempFile = securelyDeleteTempFile;
@@ -29,10 +53,10 @@ exports.sanitizeAdvisoryData = sanitizeAdvisoryData;
 exports.sanitizeFixData = sanitizeFixData;
 exports.executeWithRetry = executeWithRetry;
 exports.secureGooseExecution = secureGooseExecution;
-const fs = require("fs");
-const path = require("path");
-const os = require("os");
-const crypto = require("crypto");
+const fs = __importStar(require("fs"));
+const path = __importStar(require("path"));
+const os = __importStar(require("os"));
+const crypto = __importStar(require("crypto"));
 const util_1 = require("util");
 const child_process_1 = require("child_process");
 const writeFileAsync = (0, util_1.promisify)(fs.writeFile);
@@ -48,41 +72,37 @@ function isRecord(value) {
  * Creates a secure temporary file for Goose parameter passing
  * Avoids command line argument exposure
  */
-function createSecureTempFile(content) {
-    return __awaiter(this, void 0, void 0, function* () {
-        const tempDir = os.tmpdir();
-        const randomSuffix = crypto.randomBytes(16).toString('hex');
-        const tempFile = path.join(tempDir, `goose-params-${randomSuffix}.json`);
-        try {
-            // Write with restrictive permissions (600 - owner read/write only)
-            yield writeFileAsync(tempFile, content, { mode: 0o600 });
-            return tempFile;
-        }
-        catch (error) {
-            throw new Error(`Failed to create secure temp file: ${error}`);
-        }
-    });
+async function createSecureTempFile(content) {
+    const tempDir = os.tmpdir();
+    const randomSuffix = crypto.randomBytes(16).toString('hex');
+    const tempFile = path.join(tempDir, `goose-params-${randomSuffix}.json`);
+    try {
+        // Write with restrictive permissions (600 - owner read/write only)
+        await writeFileAsync(tempFile, content, { mode: 0o600 });
+        return tempFile;
+    }
+    catch (error) {
+        throw new Error(`Failed to create secure temp file: ${error}`);
+    }
 }
 /**
  * Securely deletes temporary file and overwrites content
  */
-function securelyDeleteTempFile(filePath) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            // Check if file exists before attempting deletion
-            yield accessAsync(filePath, fs.constants.F_OK);
-            // Overwrite with random data before deletion (basic secure deletion)
-            const fileStats = fs.statSync(filePath);
-            const randomData = crypto.randomBytes(fileStats.size);
-            yield writeFileAsync(filePath, randomData);
-            // Delete the file
-            yield unlinkAsync(filePath);
-        }
-        catch (error) {
-            // Log error but don't throw - temp file cleanup is best effort
-            console.warn(`Failed to securely delete temp file ${filePath}:`, error);
-        }
-    });
+async function securelyDeleteTempFile(filePath) {
+    try {
+        // Check if file exists before attempting deletion
+        await accessAsync(filePath, fs.constants.F_OK);
+        // Overwrite with random data before deletion (basic secure deletion)
+        const fileStats = fs.statSync(filePath);
+        const randomData = crypto.randomBytes(fileStats.size);
+        await writeFileAsync(filePath, randomData);
+        // Delete the file
+        await unlinkAsync(filePath);
+    }
+    catch (error) {
+        // Log error but don't throw - temp file cleanup is best effort
+        console.warn(`Failed to securely delete temp file ${filePath}:`, error);
+    }
 }
 /**
  * Sanitizes working directory path to prevent directory traversal
@@ -275,7 +295,7 @@ function sanitizePaths(paths) {
         try {
             return sanitizePackageName(segment);
         }
-        catch (_a) {
+        catch {
             return '';
         }
     })
@@ -403,114 +423,109 @@ function sanitizeFixData(fixData) {
 /**
  * Executes Goose with retry logic and security controls
  */
-function executeWithRetry(operation_1) {
-    return __awaiter(this, arguments, void 0, function* (operation, maxRetries = 2, baseDelay = 1000) {
-        let lastError;
-        for (let attempt = 0; attempt <= maxRetries; attempt++) {
-            try {
-                return yield operation();
+async function executeWithRetry(operation, maxRetries = 2, baseDelay = 1000) {
+    let lastError;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+            return await operation();
+        }
+        catch (error) {
+            lastError = error;
+            // Don't retry on validation errors or security issues
+            if (error instanceof Error &&
+                (error.message.includes('Invalid') ||
+                    error.message.includes('security') ||
+                    error.message.includes('injection'))) {
+                throw error;
             }
-            catch (error) {
-                lastError = error;
-                // Don't retry on validation errors or security issues
-                if (error instanceof Error &&
-                    (error.message.includes('Invalid') ||
-                        error.message.includes('security') ||
-                        error.message.includes('injection'))) {
-                    throw error;
-                }
-                if (attempt < maxRetries) {
-                    const delay = baseDelay * Math.pow(2, attempt);
-                    console.log(`Attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
-                    yield new Promise(resolve => setTimeout(resolve, delay));
-                }
+            if (attempt < maxRetries) {
+                const delay = baseDelay * Math.pow(2, attempt);
+                console.log(`Attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
             }
         }
-        throw lastError;
-    });
+    }
+    throw lastError;
 }
 /**
  * Secure Goose execution using temporary files
  * Prevents command line argument injection
  */
-function secureGooseExecution(vulnContext_1, workingDir_1, recipePath_1, signal_1) {
-    return __awaiter(this, arguments, void 0, function* (vulnContext, workingDir, recipePath, signal, timeoutMs = 30000) {
-        try {
-            // Sanitize working directory
-            const safeWorkingDir = sanitizeWorkingDirectory(workingDir);
-            // Get minimal environment
-            const env = getMinimalEnvironment();
-            // Serialize params for Goose CLI
-            const vulnContextJson = JSON.stringify(vulnContext);
-            const resolvedRecipePath = resolveRecipePath(recipePath, safeWorkingDir);
-            const params = [
-                `vuln_context=${vulnContextJson}`,
-                'validation_mode=strict',
-                'accessibility_level=wcag_aa'
-            ];
-            // Execute with security controls
-            return yield new Promise((resolve, reject) => {
-                var _a, _b;
-                const gooseProcess = (0, child_process_1.spawn)('goose', [
-                    'run',
-                    '--recipe',
-                    resolvedRecipePath,
-                    '--params',
-                    params[0],
-                    '--params',
-                    params[1],
-                    '--params',
-                    params[2],
-                    '--quiet',
-                    '--no-session'
-                ], {
-                    cwd: safeWorkingDir,
-                    env,
-                    stdio: ['ignore', 'pipe', 'pipe']
-                });
-                let output = '';
-                let errorOutput = '';
-                (_a = gooseProcess.stdout) === null || _a === void 0 ? void 0 : _a.on('data', (data) => {
-                    output += data.toString();
-                });
-                (_b = gooseProcess.stderr) === null || _b === void 0 ? void 0 : _b.on('data', (data) => {
-                    errorOutput += data.toString();
-                });
-                gooseProcess.on('close', (code) => {
-                    if (code === 0) {
-                        resolve(output);
-                    }
-                    else {
-                        reject(new Error(`Goose execution failed (code ${code}): ${errorOutput}`));
-                    }
-                });
-                gooseProcess.on('error', (error) => {
-                    reject(new Error(`Goose process error: ${error.message}`));
-                });
-                if (signal) {
-                    if (signal.aborted) {
-                        gooseProcess.kill('SIGTERM');
-                        reject(new Error('Goose execution canceled'));
-                        return;
-                    }
-                    signal.addEventListener('abort', () => {
-                        gooseProcess.kill('SIGTERM');
-                        reject(new Error('Goose execution canceled'));
-                    }, { once: true });
+async function secureGooseExecution(vulnContext, workingDir, recipePath, signal, timeoutMs = 30000) {
+    try {
+        // Sanitize working directory
+        const safeWorkingDir = sanitizeWorkingDirectory(workingDir);
+        // Get minimal environment
+        const env = getMinimalEnvironment();
+        // Serialize params for Goose CLI
+        const vulnContextJson = JSON.stringify(vulnContext);
+        const resolvedRecipePath = resolveRecipePath(recipePath, safeWorkingDir);
+        const params = [
+            `vuln_context=${vulnContextJson}`,
+            'validation_mode=strict',
+            'accessibility_level=wcag_aa'
+        ];
+        // Execute with security controls
+        return await new Promise((resolve, reject) => {
+            const gooseProcess = (0, child_process_1.spawn)('goose', [
+                'run',
+                '--recipe',
+                resolvedRecipePath,
+                '--params',
+                params[0],
+                '--params',
+                params[1],
+                '--params',
+                params[2],
+                '--quiet',
+                '--no-session'
+            ], {
+                cwd: safeWorkingDir,
+                env,
+                stdio: ['ignore', 'pipe', 'pipe']
+            });
+            let output = '';
+            let errorOutput = '';
+            gooseProcess.stdout?.on('data', (data) => {
+                output += data.toString();
+            });
+            gooseProcess.stderr?.on('data', (data) => {
+                errorOutput += data.toString();
+            });
+            gooseProcess.on('close', (code) => {
+                if (code === 0) {
+                    resolve(output);
                 }
-                if (timeoutMs > 0) {
-                    const timer = setTimeout(() => {
-                        gooseProcess.kill('SIGTERM');
-                        reject(new Error('Goose execution timed out'));
-                    }, timeoutMs);
-                    gooseProcess.on('close', () => clearTimeout(timer));
-                    gooseProcess.on('error', () => clearTimeout(timer));
+                else {
+                    reject(new Error(`Goose execution failed (code ${code}): ${errorOutput}`));
                 }
             });
-        }
-        finally {
-            // no temp file cleanup needed
-        }
-    });
+            gooseProcess.on('error', (error) => {
+                reject(new Error(`Goose process error: ${error.message}`));
+            });
+            if (signal) {
+                if (signal.aborted) {
+                    gooseProcess.kill('SIGTERM');
+                    reject(new Error('Goose execution canceled'));
+                    return;
+                }
+                signal.addEventListener('abort', () => {
+                    gooseProcess.kill('SIGTERM');
+                    reject(new Error('Goose execution canceled'));
+                }, { once: true });
+            }
+            if (timeoutMs > 0) {
+                const timer = setTimeout(() => {
+                    gooseProcess.kill('SIGTERM');
+                    reject(new Error('Goose execution timed out'));
+                }, timeoutMs);
+                gooseProcess.on('close', () => clearTimeout(timer));
+                gooseProcess.on('error', () => clearTimeout(timer));
+            }
+        });
+    }
+    finally {
+        // no temp file cleanup needed
+    }
 }
 //# sourceMappingURL=security.js.map

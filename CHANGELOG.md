@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.3.1](https://github.com/branic18/Trident/compare/v1.3.0...v1.3.1) (2026-03-07)
+
+
+### Bug Fixes
+
+* Updated user experience- clear start path and resolved merge conflicts ([45adda1](https://github.com/branic18/Trident/commit/45adda109cc23591ec2eb70d956c4eebb16ff730))
+
+## [1.3.0](https://github.com/branic18/Trident/compare/v1.2.0...v1.3.0) (2026-03-07)
+
+
+### Features
+
+* **goose:** add analysis pipeline, lint script, tests, and compiled output ([974ab12](https://github.com/branic18/Trident/commit/974ab12a02c954dc9d81becd80bc0e6745665500))
+
+
+### Bug Fixes
+
+* remove implicit any usage ([6202316](https://github.com/branic18/Trident/commit/6202316fd836054990d2d86bde7090a103c69e4f))
+* tighten types and lint in goose + extension ([5403516](https://github.com/branic18/Trident/commit/54035164065b64bc9c1e70fbd6eacbaa8220d6eb))
+* Updated user experience, clear start path ([0cf3f11](https://github.com/branic18/Trident/commit/0cf3f112c7cbfa50c800db4f0ccbd2f89a5d4781))
+
 ## [1.2.0](https://github.com/branic18/Trident/compare/v1.1.0...v1.2.0) (2026-03-06)
 
 

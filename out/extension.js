@@ -1,23 +1,47 @@
 "use strict";
-var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
-    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
-    return new (P || (P = Promise))(function (resolve, reject) {
-        function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
-        function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
-        step((generator = generator.apply(thisArg, _arguments || [])).next());
-    });
-};
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.activate = activate;
 exports.resolveWorkspacePath = resolveWorkspacePath;
 exports.countOccurrences = countOccurrences;
 exports.onVulnSelected = onVulnSelected;
 exports.deactivate = deactivate;
-const vscode = require("vscode");
+const vscode = __importStar(require("vscode"));
 const child_process_1 = require("child_process");
-const path = require("path");
-const fs = require("fs");
+const path = __importStar(require("path"));
+const fs = __importStar(require("fs"));
 const util_1 = require("util");
 const buildVulnContext_1 = require("./goose/buildVulnContext");
 const security_1 = require("./goose/security");
@@ -55,16 +79,15 @@ function activate(context) {
         gooseLogPath = path.join(context.globalStorageUri.fsPath, 'goose-metrics.jsonl');
         gooseCachePath = path.join(context.globalStorageUri.fsPath, 'trident-cache.json');
     }
-    catch (_a) {
+    catch {
         gooseLogPath = null;
         gooseCachePath = null;
     }
     initializeSharedCachePath();
     loadPersistentGooseCache();
     // Register the command for scanning
-    const scanCommand = vscode.commands.registerCommand('vulnerability-scanner.scan', () => __awaiter(this, void 0, void 0, function* () {
-        var _a;
-        const workspaceFolder = (_a = vscode.workspace.workspaceFolders) === null || _a === void 0 ? void 0 : _a[0];
+    const scanCommand = vscode.commands.registerCommand('vulnerability-scanner.scan', async () => {
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
             vscode.window.showWarningMessage('In order to use scanning features, you can open a Node project folder.');
             return;
@@ -84,15 +107,15 @@ function activate(context) {
             if (currentPanel === panel)
                 currentPanel = null;
         });
-        panel.webview.onDidReceiveMessage((msg) => __awaiter(this, void 0, void 0, function* () {
+        panel.webview.onDidReceiveMessage(async (msg) => {
             if (!msg || !msg.command)
                 return;
             if (msg.command === 'vulnSelected' && msg.vuln) {
-                yield onVulnSelected(msg.vuln);
+                await onVulnSelected(msg.vuln);
                 return;
             }
             if (msg.command === 'applyCodeFix') {
-                yield applyCodeFixFromWebview(msg.codeFix);
+                await applyCodeFixFromWebview(msg.codeFix);
             }
             if (msg.command === 'gooseCancel' && msg.vulnId) {
                 cancelGooseAnalysis(String(msg.vulnId));
@@ -104,9 +127,9 @@ function activate(context) {
                 logGoose(`Feedback: vulnId=${msg.vulnId} helpful=${helpful} reason=${reason}`);
                 vscode.window.showInformationMessage('Thanks for the feedback.');
             }
-        }));
-        yield runNpmAudit(panel, projectRoot);
-    }));
+        });
+        await runNpmAudit(panel, projectRoot);
+    });
     // Register the view
     const treeViewProvider = new VulnerabilityTreeViewProvider();
     globalThis.__vulnTreeProvider = treeViewProvider;
@@ -123,10 +146,8 @@ function activate(context) {
 }
 let lastAuditPayload = null;
 class VulnerabilityTreeViewProvider {
-    constructor() {
-        this._onDidChangeTreeData = new vscode.EventEmitter();
-        this.onDidChangeTreeData = this._onDidChangeTreeData.event;
-    }
+    _onDidChangeTreeData = new vscode.EventEmitter();
+    onDidChangeTreeData = this._onDidChangeTreeData.event;
     setAuditPayload(payload) {
         lastAuditPayload = payload;
         this._onDidChangeTreeData.fire();
@@ -169,6 +190,7 @@ function escapeHtml(str) {
         .replace(/"/g, '&quot;');
 }
 class VulnerabilityItem extends vscode.TreeItem {
+    id;
     constructor(label, commandId, id) {
         super(label);
         this.id = id;
@@ -231,31 +253,31 @@ function normalizeCodeSnippet(value) {
         return undefined;
     return { filePath, startLine, endLine, before };
 }
-function runNpmAudit(panel, projectRoot) {
-    return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b;
-        panel.webview.html = getWebviewContent(panel.webview);
-        try {
-            const auditResults = yield runAuditWithLockfileFallback(projectRoot);
-            const auditError = getAuditError(auditResults);
-            if (auditError) {
-                const message = (_b = (_a = auditError.summary) !== null && _a !== void 0 ? _a : auditError.detail) !== null && _b !== void 0 ? _b : 'npm audit failed';
-                vscode.window.showErrorMessage(`npm audit failed: ${message}`);
-                panel.webview.postMessage({ command: 'loadError', error: message });
-                return;
-            }
-            const provider = globalThis.__vulnTreeProvider;
-            if (provider)
-                provider.setAuditPayload(auditResults);
-            panel.webview.postMessage({ command: 'loadData', data: auditResults });
-            pruneCacheByAuditResults(auditResults);
+async function runNpmAudit(panel, projectRoot) {
+    panel.webview.html = getWebviewContent(panel.webview);
+    try {
+        if (!hasLockfile(projectRoot)) {
+            panel.webview.postMessage({ command: 'loadStatus', status: 'Creating lockfile...' });
         }
-        catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
+        const auditResults = await runAuditWithLockfileFallback(projectRoot);
+        const auditError = getAuditError(auditResults);
+        if (auditError) {
+            const message = auditError.summary ?? auditError.detail ?? 'npm audit failed';
             vscode.window.showErrorMessage(`npm audit failed: ${message}`);
             panel.webview.postMessage({ command: 'loadError', error: message });
+            return;
         }
-    });
+        const provider = globalThis.__vulnTreeProvider;
+        if (provider)
+            provider.setAuditPayload(auditResults);
+        panel.webview.postMessage({ command: 'loadData', data: auditResults });
+        pruneCacheByAuditResults(auditResults);
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        vscode.window.showErrorMessage(`npm audit failed: ${message}`);
+        panel.webview.postMessage({ command: 'loadError', error: message });
+    }
 }
 function sendToWebview(message) {
     if (!currentPanel)
@@ -280,7 +302,7 @@ function resolveRecipePathForExtension(recipePath, projectRoot) {
     if (path.isAbsolute(recipePath))
         return recipePath;
     const candidates = [];
-    if (extensionContext === null || extensionContext === void 0 ? void 0 : extensionContext.extensionPath) {
+    if (extensionContext?.extensionPath) {
         candidates.push(path.resolve(extensionContext.extensionPath, recipePath));
     }
     if (projectRoot) {
@@ -293,13 +315,12 @@ function resolveRecipePathForExtension(recipePath, projectRoot) {
     return recipePath;
 }
 function getRecipeVersion(recipePath) {
-    var _a, _b;
     try {
-        const resolved = resolveRecipePathForExtension(recipePath, (_b = (_a = vscode.workspace.workspaceFolders) === null || _a === void 0 ? void 0 : _a[0]) === null || _b === void 0 ? void 0 : _b.uri.fsPath);
+        const resolved = resolveRecipePathForExtension(recipePath, vscode.workspace.workspaceFolders?.[0]?.uri.fsPath);
         const stat = fs.statSync(resolved);
         return `${stat.mtimeMs}:${stat.size}`;
     }
-    catch (_c) {
+    catch {
         return 'unknown';
     }
 }
@@ -322,15 +343,14 @@ function recordGooseEvent(event) {
     if (!gooseLogPath)
         return;
     try {
-        fs.appendFileSync(gooseLogPath, JSON.stringify(Object.assign({ timestamp: new Date().toISOString() }, event)) + '\n');
+        fs.appendFileSync(gooseLogPath, JSON.stringify({ timestamp: new Date().toISOString(), ...event }) + '\n');
     }
-    catch (_a) {
+    catch {
         // best effort
     }
 }
 function initializeSharedCachePath() {
-    var _a;
-    const workspaceFolder = (_a = vscode.workspace.workspaceFolders) === null || _a === void 0 ? void 0 : _a[0];
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     if (!workspaceFolder) {
         gooseSharedCachePath = null;
         return;
@@ -341,7 +361,7 @@ function initializeSharedCachePath() {
         fs.mkdirSync(dir, { recursive: true });
         gooseSharedCachePath = path.join(dir, 'trident-cache.json');
     }
-    catch (_b) {
+    catch {
         gooseSharedCachePath = null;
     }
 }
@@ -358,7 +378,7 @@ function loadPersistentGooseCache() {
             logGoose(`Loaded ${parsed.length} cached Goose insights from ${target}.`);
         }
     }
-    catch (_a) {
+    catch {
         // best effort
     }
 }
@@ -371,7 +391,7 @@ function savePersistentGooseCache() {
         const entries = gooseCache.exportEntries();
         fs.writeFileSync(target, JSON.stringify(entries, null, 2), 'utf8');
     }
-    catch (_a) {
+    catch {
         // best effort
     }
 }
@@ -401,41 +421,37 @@ function pruneCacheByAuditResults(auditResults) {
     gooseCache.pruneByKeys(validKeys);
     savePersistentGooseCache();
 }
-function ensureGooseAvailable() {
-    return __awaiter(this, void 0, void 0, function* () {
-        if (gooseChecked)
-            return gooseAvailable;
-        gooseChecked = true;
-        try {
-            yield execAsync('goose --version', { timeout: 5000 });
-            gooseAvailable = true;
-            logGoose('Goose CLI detected.');
-            return true;
-        }
-        catch (_a) {
-            gooseAvailable = false;
-            logGoose('Goose CLI not found on PATH.');
-            return false;
-        }
-    });
-}
-function ensureGooseConsent() {
-    return __awaiter(this, void 0, void 0, function* () {
-        if (!extensionContext)
-            return true;
-        const consent = extensionContext.globalState.get('gooseConsent');
-        if (consent === 'enabled')
-            return true;
-        if (consent === 'disabled')
-            return false;
-        const choice = yield vscode.window.showInformationMessage('Enable Goose AI analysis for vulnerability explanations?', 'Enable', 'Not now');
-        if (choice === 'Enable') {
-            yield extensionContext.globalState.update('gooseConsent', 'enabled');
-            return true;
-        }
-        yield extensionContext.globalState.update('gooseConsent', 'disabled');
+async function ensureGooseAvailable() {
+    if (gooseChecked)
+        return gooseAvailable;
+    gooseChecked = true;
+    try {
+        await execAsync('goose --version', { timeout: 5000 });
+        gooseAvailable = true;
+        logGoose('Goose CLI detected.');
+        return true;
+    }
+    catch {
+        gooseAvailable = false;
+        logGoose('Goose CLI not found on PATH.');
         return false;
-    });
+    }
+}
+async function ensureGooseConsent() {
+    if (!extensionContext)
+        return true;
+    const consent = extensionContext.globalState.get('gooseConsent');
+    if (consent === 'enabled')
+        return true;
+    if (consent === 'disabled')
+        return false;
+    const choice = await vscode.window.showInformationMessage('Enable Goose AI analysis for vulnerability explanations?', 'Enable', 'Not now');
+    if (choice === 'Enable') {
+        await extensionContext.globalState.update('gooseConsent', 'enabled');
+        return true;
+    }
+    await extensionContext.globalState.update('gooseConsent', 'disabled');
+    return false;
 }
 function classifyGooseError(err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -451,93 +467,88 @@ function classifyGooseError(err) {
         return { type: 'process_error', message: msg };
     return { type: 'unknown', message: msg };
 }
-function runSecureGooseWithRetry(context, workingDir, recipePath, signal, maxRetries, timeoutMs) {
-    return __awaiter(this, void 0, void 0, function* () {
-        let attempt = 0;
-        let lastError = null;
-        const max = Math.max(0, Math.min(3, maxRetries));
-        const resolvedRecipePath = resolveRecipePathForExtension(recipePath, workingDir);
-        while (attempt <= max) {
-            if (signal.aborted) {
-                throw new Error('Goose execution canceled');
-            }
-            try {
-                return yield (0, security_1.secureGooseExecution)(context, workingDir, resolvedRecipePath, signal, timeoutMs);
-            }
-            catch (err) {
-                lastError = err;
-                const { type } = classifyGooseError(err);
-                if (type === 'validation_error' || type === 'invalid_json')
-                    break;
-                if (attempt >= max)
-                    break;
-                const delay = 300 * Math.pow(2, attempt);
-                yield new Promise(resolve => setTimeout(resolve, delay));
-                attempt += 1;
-            }
+async function runSecureGooseWithRetry(context, workingDir, recipePath, signal, maxRetries, timeoutMs) {
+    let attempt = 0;
+    let lastError = null;
+    const max = Math.max(0, Math.min(3, maxRetries));
+    const resolvedRecipePath = resolveRecipePathForExtension(recipePath, workingDir);
+    while (attempt <= max) {
+        if (signal.aborted) {
+            throw new Error('Goose execution canceled');
         }
-        throw lastError !== null && lastError !== void 0 ? lastError : new Error('Goose execution failed');
-    });
+        try {
+            return await (0, security_1.secureGooseExecution)(context, workingDir, resolvedRecipePath, signal, timeoutMs);
+        }
+        catch (err) {
+            lastError = err;
+            const { type } = classifyGooseError(err);
+            if (type === 'validation_error' || type === 'invalid_json')
+                break;
+            if (attempt >= max)
+                break;
+            const delay = 300 * Math.pow(2, attempt);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            attempt += 1;
+        }
+    }
+    throw lastError ?? new Error('Goose execution failed');
 }
-function applyCodeFixFromWebview(codeFix) {
-    return __awaiter(this, void 0, void 0, function* () {
-        var _a;
-        if (!codeFix || !codeFix.filePath || !codeFix.before || !codeFix.after) {
-            vscode.window.showWarningMessage('Apply fix failed: missing code fix data.');
-            return;
-        }
-        if (codeFix.before.length > MAX_CODE_FIX_CHARS || codeFix.after.length > MAX_CODE_FIX_CHARS) {
-            vscode.window.showWarningMessage('Apply fix failed: code fix payload too large.');
-            return;
-        }
-        const workspaceFolder = (_a = vscode.workspace.workspaceFolders) === null || _a === void 0 ? void 0 : _a[0];
-        const projectRoot = workspaceFolder === null || workspaceFolder === void 0 ? void 0 : workspaceFolder.uri.fsPath;
-        if (!projectRoot) {
-            vscode.window.showWarningMessage('Apply fix failed: no workspace open.');
-            return;
-        }
-        const resolvedPath = resolveWorkspacePath(codeFix.filePath, projectRoot);
-        if (!resolvedPath) {
-            vscode.window.showWarningMessage('Apply fix failed: invalid file path.');
-            return;
-        }
-        if (!fs.existsSync(resolvedPath)) {
-            vscode.window.showWarningMessage(`Apply fix failed: file not found: ${resolvedPath}`);
-            return;
-        }
-        const doc = yield vscode.workspace.openTextDocument(resolvedPath);
-        const fileText = doc.getText();
-        const occurrences = countOccurrences(fileText, codeFix.before);
-        if (occurrences === 0) {
-            vscode.window.showWarningMessage('Apply fix failed: expected code snippet not found in file.');
-            return;
-        }
-        const applyAll = occurrences > 1
-            ? yield vscode.window.showWarningMessage(`Found ${occurrences} matching snippets in ${path.basename(resolvedPath)}. Apply all?`, { modal: true }, 'Apply All', 'Apply First')
-            : 'Apply First';
-        if (!applyAll)
-            return;
-        const updatedText = applyAll === 'Apply All'
-            ? fileText.split(codeFix.before).join(codeFix.after)
-            : fileText.replace(codeFix.before, codeFix.after);
-        const previewDoc = yield vscode.workspace.openTextDocument({
-            content: updatedText,
-            language: doc.languageId
-        });
-        yield vscode.commands.executeCommand('vscode.diff', doc.uri, previewDoc.uri, `Apply suggested fix: ${path.basename(resolvedPath)}`);
-        const confirm = yield vscode.window.showWarningMessage(`Apply suggested changes to ${path.basename(resolvedPath)}?`, { modal: true }, 'Apply');
-        if (confirm !== 'Apply')
-            return;
-        const edit = new vscode.WorkspaceEdit();
-        const fullRange = new vscode.Range(doc.positionAt(0), doc.positionAt(fileText.length));
-        edit.replace(doc.uri, fullRange, updatedText);
-        const applied = yield vscode.workspace.applyEdit(edit);
-        if (!applied) {
-            vscode.window.showWarningMessage('Apply fix failed: could not apply workspace edit.');
-            return;
-        }
-        vscode.window.showInformationMessage(`Applied suggested fix to ${path.basename(resolvedPath)}.`);
+async function applyCodeFixFromWebview(codeFix) {
+    if (!codeFix || !codeFix.filePath || !codeFix.before || !codeFix.after) {
+        vscode.window.showWarningMessage('Apply fix failed: missing code fix data.');
+        return;
+    }
+    if (codeFix.before.length > MAX_CODE_FIX_CHARS || codeFix.after.length > MAX_CODE_FIX_CHARS) {
+        vscode.window.showWarningMessage('Apply fix failed: code fix payload too large.');
+        return;
+    }
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const projectRoot = workspaceFolder?.uri.fsPath;
+    if (!projectRoot) {
+        vscode.window.showWarningMessage('Apply fix failed: no workspace open.');
+        return;
+    }
+    const resolvedPath = resolveWorkspacePath(codeFix.filePath, projectRoot);
+    if (!resolvedPath) {
+        vscode.window.showWarningMessage('Apply fix failed: invalid file path.');
+        return;
+    }
+    if (!fs.existsSync(resolvedPath)) {
+        vscode.window.showWarningMessage(`Apply fix failed: file not found: ${resolvedPath}`);
+        return;
+    }
+    const doc = await vscode.workspace.openTextDocument(resolvedPath);
+    const fileText = doc.getText();
+    const occurrences = countOccurrences(fileText, codeFix.before);
+    if (occurrences === 0) {
+        vscode.window.showWarningMessage('Apply fix failed: expected code snippet not found in file.');
+        return;
+    }
+    const applyAll = occurrences > 1
+        ? await vscode.window.showWarningMessage(`Found ${occurrences} matching snippets in ${path.basename(resolvedPath)}. Apply all?`, { modal: true }, 'Apply All', 'Apply First')
+        : 'Apply First';
+    if (!applyAll)
+        return;
+    const updatedText = applyAll === 'Apply All'
+        ? fileText.split(codeFix.before).join(codeFix.after)
+        : fileText.replace(codeFix.before, codeFix.after);
+    const previewDoc = await vscode.workspace.openTextDocument({
+        content: updatedText,
+        language: doc.languageId
     });
+    await vscode.commands.executeCommand('vscode.diff', doc.uri, previewDoc.uri, `Apply suggested fix: ${path.basename(resolvedPath)}`);
+    const confirm = await vscode.window.showWarningMessage(`Apply suggested changes to ${path.basename(resolvedPath)}?`, { modal: true }, 'Apply');
+    if (confirm !== 'Apply')
+        return;
+    const edit = new vscode.WorkspaceEdit();
+    const fullRange = new vscode.Range(doc.positionAt(0), doc.positionAt(fileText.length));
+    edit.replace(doc.uri, fullRange, updatedText);
+    const applied = await vscode.workspace.applyEdit(edit);
+    if (!applied) {
+        vscode.window.showWarningMessage('Apply fix failed: could not apply workspace edit.');
+        return;
+    }
+    vscode.window.showInformationMessage(`Applied suggested fix to ${path.basename(resolvedPath)}.`);
 }
 function resolveWorkspacePath(filePath, projectRoot) {
     const normalizedRoot = path.resolve(projectRoot);
@@ -571,266 +582,276 @@ function cancelGooseAnalysis(vulnId) {
     gooseAbortControllers.delete(vulnId);
     sendToWebview({ type: 'gooseInsightError', vulnId, error: 'AI analysis canceled' });
 }
-function onVulnSelected(vuln) {
-    return __awaiter(this, void 0, void 0, function* () {
-        var _a, _b, _c, _d, _e;
-        // ===== PHASE 1: SECURITY VALIDATION =====
-        console.log('🔒 Starting secure vulnerability analysis...');
-        const config = getGooseConfig();
-        gooseCache.configure({ maxEntries: config.cacheMaxEntries, maxAgeMs: config.cacheMaxAgeMs });
-        gooseLimiter.setMaxConcurrency(config.maxConcurrency);
-        gooseMetrics.totalRequests += 1;
-        const requestStart = Date.now();
-        if (!config.enabled) {
-            sendToWebview({
-                type: 'gooseInsightError',
-                vulnId: (0, security_2.sanitizeId)(String(vuln.id || `${vuln.packageName || 'pkg'}:${vuln.version || 'unknown'}:${vuln.title || 'vuln'}`)),
-                error: 'AI analysis disabled by configuration.'
-            });
-            logGoose('AI analysis skipped: disabled by configuration.');
-            logGooseMetrics(0);
-            return;
-        }
-        const consentOk = yield ensureGooseConsent();
-        if (!consentOk) {
-            sendToWebview({
-                type: 'gooseInsightError',
-                vulnId: (0, security_2.sanitizeId)(String(vuln.id || `${vuln.packageName || 'pkg'}:${vuln.version || 'unknown'}:${vuln.title || 'vuln'}`)),
-                error: 'AI analysis disabled. Enable in settings or consent prompt.'
-            });
-            logGoose('AI analysis skipped: user declined consent.');
-            logGooseMetrics(0);
-            return;
-        }
-        const gooseReady = yield ensureGooseAvailable();
-        if (!gooseReady) {
-            sendToWebview({
-                type: 'gooseInsightError',
-                vulnId: (0, security_2.sanitizeId)(String(vuln.id || `${vuln.packageName || 'pkg'}:${vuln.version || 'unknown'}:${vuln.title || 'vuln'}`)),
-                error: 'Goose CLI not found. Install Goose and ensure it is on PATH.'
-            });
-            vscode.window.showWarningMessage('Goose CLI not found. Install Goose and ensure it is on PATH.');
-            logGooseMetrics(0);
-            return;
-        }
-        // SECURITY: Sanitize all inputs before processing
-        let sanitizedVulnId;
-        let sanitizedPkgName;
-        let sanitizedVersion;
+async function onVulnSelected(vuln) {
+    // ===== PHASE 1: SECURITY VALIDATION =====
+    console.log('🔒 Starting secure vulnerability analysis...');
+    const config = getGooseConfig();
+    gooseCache.configure({ maxEntries: config.cacheMaxEntries, maxAgeMs: config.cacheMaxAgeMs });
+    gooseLimiter.setMaxConcurrency(config.maxConcurrency);
+    gooseMetrics.totalRequests += 1;
+    const requestStart = Date.now();
+    if (!config.enabled) {
+        sendToWebview({
+            type: 'gooseInsightError',
+            vulnId: (0, security_2.sanitizeId)(String(vuln.id || `${vuln.packageName || 'pkg'}:${vuln.version || 'unknown'}:${vuln.title || 'vuln'}`)),
+            error: 'AI analysis disabled by configuration.'
+        });
+        logGoose('AI analysis skipped: disabled by configuration.');
+        logGooseMetrics(0);
+        return;
+    }
+    const consentOk = await ensureGooseConsent();
+    if (!consentOk) {
+        sendToWebview({
+            type: 'gooseInsightError',
+            vulnId: (0, security_2.sanitizeId)(String(vuln.id || `${vuln.packageName || 'pkg'}:${vuln.version || 'unknown'}:${vuln.title || 'vuln'}`)),
+            error: 'AI analysis disabled. Enable in settings or consent prompt.'
+        });
+        logGoose('AI analysis skipped: user declined consent.');
+        logGooseMetrics(0);
+        return;
+    }
+    const gooseReady = await ensureGooseAvailable();
+    if (!gooseReady) {
+        sendToWebview({
+            type: 'gooseInsightError',
+            vulnId: (0, security_2.sanitizeId)(String(vuln.id || `${vuln.packageName || 'pkg'}:${vuln.version || 'unknown'}:${vuln.title || 'vuln'}`)),
+            error: 'Goose CLI not found. Install Goose and ensure it is on PATH.'
+        });
+        vscode.window.showWarningMessage('Goose CLI not found. Install Goose and ensure it is on PATH.');
+        logGooseMetrics(0);
+        return;
+    }
+    // SECURITY: Sanitize all inputs before processing
+    let sanitizedVulnId;
+    let sanitizedPkgName;
+    let sanitizedVersion;
+    try {
+        sanitizedVulnId = (0, security_2.sanitizeId)(String(vuln.id || `${vuln.packageName || 'pkg'}:${vuln.version || 'unknown'}:${vuln.title || 'vuln'}`));
+        sanitizedPkgName = (0, security_2.sanitizePackageName)(vuln.packageName || '');
+        sanitizedVersion = (0, security_2.sanitizeVersion)(vuln.version || '');
+    }
+    catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        let fallbackId = 'unknown';
         try {
-            sanitizedVulnId = (0, security_2.sanitizeId)(String(vuln.id || `${vuln.packageName || 'pkg'}:${vuln.version || 'unknown'}:${vuln.title || 'vuln'}`));
-            sanitizedPkgName = (0, security_2.sanitizePackageName)(vuln.packageName || '');
-            sanitizedVersion = (0, security_2.sanitizeVersion)(vuln.version || '');
+            fallbackId = (0, security_2.sanitizeId)(String(vuln.id || `${vuln.packageName || 'pkg'}:${vuln.version || 'unknown'}:${vuln.title || 'vuln'}`));
         }
-        catch (err) {
-            const message = err instanceof Error ? err.message : String(err);
-            let fallbackId = 'unknown';
+        catch {
+            // best effort fallback
+        }
+        sendToWebview({
+            type: 'gooseInsightError',
+            vulnId: fallbackId,
+            error: 'AI analysis failed due to invalid vulnerability data.'
+        });
+        logGoose(`Input validation failed: ${message}`);
+        gooseMetrics.errors += 1;
+        logGooseMetrics(0);
+        return;
+    }
+    // Get project root for secure file analysis
+    const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+    const projectRoot = config.dataMode === 'metadata' ? undefined : workspaceFolder?.uri.fsPath;
+    try {
+        // ===== PHASE 2: ENHANCED CONTEXT BUILDING =====
+        console.log('📊 Building enhanced vulnerability context...');
+        // Build vulnerability context with sanitized inputs and enhanced schema
+        const context = await (0, buildVulnContext_1.buildVulnContext)({
+            vulnId: sanitizedVulnId,
+            pkgName: sanitizedPkgName,
+            pkgVersion: sanitizedVersion,
+            npmSeverity: normalizeSeverity(vuln.severity),
+            cvssScore: vuln.cvss?.score ?? null,
+            cvssVector: vuln.cvss?.vectorString ?? null,
+            cweIds: vuln.cweIds || [],
+            cweNames: vuln.cweNames || [],
+            githubAdvisoryId: vuln.githubAdvisoryId,
+            githubSummary: vuln.githubSummary,
+            githubUrl: vuln.githubUrl,
+            paths: normalizePaths(vuln.paths),
+            usedInFiles: config.dataMode === 'metadata' ? [] : (vuln.usedInFiles || []), // Will be auto-detected if empty/missing
+            environment: normalizeEnvironment(vuln.environment), // Will be auto-detected if missing
+            projectType: 'web-app', // Enterprise project classification
+            projectRoot: projectRoot, // Enable secure file analysis
+            fixInfo: normalizeFixInfo(vuln.fixAvailable),
+            codeSnippet: config.dataMode === 'metadata' ? undefined : normalizeCodeSnippet(vuln.codeSnippet),
+        });
+        console.log(`📋 Context built with ${Object.keys(context).length} security-validated fields`);
+        const recipeVersion = getRecipeVersion(config.recipePath);
+        const contextHash = (0, cache_1.computeContextHash)(context);
+        const cached = gooseCache.get(sanitizedVulnId, contextHash, recipeVersion);
+        if (cached) {
+            gooseMetrics.cacheHits += 1;
+            sendToWebview({ type: 'gooseInsight', vulnId: sanitizedVulnId, data: cached });
+            console.log(`✅ Serving validated cached analysis for ${sanitizedPkgName}@${sanitizedVersion}`);
+            logGooseMetrics(0);
+            recordGooseEvent({ type: 'cache_hit', vulnId: sanitizedVulnId });
+            return;
+        }
+        // Notify webview that analysis is pending
+        sendToWebview({ type: 'gooseInsight', vulnId: sanitizedVulnId, data: { pending: true } });
+        // ===== PHASE 3: SECURE AI EXECUTION =====
+        console.log('🤖 Executing secure AI analysis with enterprise validation...');
+        // SECURITY: Use secure Goose execution with comprehensive validation
+        const abortController = new AbortController();
+        gooseAbortControllers.set(sanitizedVulnId, abortController);
+        const rawInsight = await gooseLimiter.run(async () => {
+            if (abortController.signal.aborted) {
+                throw new Error('Goose execution canceled');
+            }
+            return await runSecureGooseWithRetry(context, projectRoot || process.cwd(), config.recipePath, abortController.signal, config.maxRetries, config.timeoutMs);
+        });
+        gooseAbortControllers.delete(sanitizedVulnId);
+        const executionTimeMs = Date.now() - requestStart;
+        // ===== PHASE 4: OUTPUT VALIDATION & ENTERPRISE FORMATTING =====
+        console.log('🛡️ Validating AI output against enterprise security standards...');
+        // SECURITY: Validate AI output before caching
+        const validator = new validator_1.JsonSchemaValidator();
+        let parsedInsight = rawInsight;
+        if (typeof rawInsight === 'string') {
             try {
-                fallbackId = (0, security_2.sanitizeId)(String(vuln.id || `${vuln.packageName || 'pkg'}:${vuln.version || 'unknown'}:${vuln.title || 'vuln'}`));
+                parsedInsight = JSON.parse(rawInsight);
             }
-            catch (_f) {
-                // best effort fallback
+            catch {
+                throw new Error('Invalid JSON format from Goose');
             }
-            sendToWebview({
-                type: 'gooseInsightError',
-                vulnId: fallbackId,
-                error: 'AI analysis failed due to invalid vulnerability data.'
-            });
-            logGoose(`Input validation failed: ${message}`);
-            gooseMetrics.errors += 1;
-            logGooseMetrics(0);
-            return;
         }
-        // Get project root for secure file analysis
-        const workspaceFolder = (_a = vscode.workspace.workspaceFolders) === null || _a === void 0 ? void 0 : _a[0];
-        const projectRoot = config.dataMode === 'metadata' ? undefined : workspaceFolder === null || workspaceFolder === void 0 ? void 0 : workspaceFolder.uri.fsPath;
-        try {
-            // ===== PHASE 2: ENHANCED CONTEXT BUILDING =====
-            console.log('📊 Building enhanced vulnerability context...');
-            // Build vulnerability context with sanitized inputs and enhanced schema
-            const context = yield (0, buildVulnContext_1.buildVulnContext)({
-                vulnId: sanitizedVulnId,
-                pkgName: sanitizedPkgName,
-                pkgVersion: sanitizedVersion,
-                npmSeverity: normalizeSeverity(vuln.severity),
-                cvssScore: (_c = (_b = vuln.cvss) === null || _b === void 0 ? void 0 : _b.score) !== null && _c !== void 0 ? _c : null,
-                cvssVector: (_e = (_d = vuln.cvss) === null || _d === void 0 ? void 0 : _d.vectorString) !== null && _e !== void 0 ? _e : null,
-                cweIds: vuln.cweIds || [],
-                cweNames: vuln.cweNames || [],
-                githubAdvisoryId: vuln.githubAdvisoryId,
-                githubSummary: vuln.githubSummary,
-                githubUrl: vuln.githubUrl,
-                paths: normalizePaths(vuln.paths),
-                usedInFiles: config.dataMode === 'metadata' ? [] : (vuln.usedInFiles || []), // Will be auto-detected if empty/missing
-                environment: normalizeEnvironment(vuln.environment), // Will be auto-detected if missing
-                projectType: 'web-app', // Enterprise project classification
-                projectRoot: projectRoot, // Enable secure file analysis
-                fixInfo: normalizeFixInfo(vuln.fixAvailable),
-                codeSnippet: config.dataMode === 'metadata' ? undefined : normalizeCodeSnippet(vuln.codeSnippet),
-            });
-            console.log(`📋 Context built with ${Object.keys(context).length} security-validated fields`);
-            const recipeVersion = getRecipeVersion(config.recipePath);
-            const contextHash = (0, cache_1.computeContextHash)(context);
-            const cached = gooseCache.get(sanitizedVulnId, contextHash, recipeVersion);
-            if (cached) {
-                gooseMetrics.cacheHits += 1;
-                sendToWebview({ type: 'gooseInsight', vulnId: sanitizedVulnId, data: cached });
-                console.log(`✅ Serving validated cached analysis for ${sanitizedPkgName}@${sanitizedVersion}`);
-                logGooseMetrics(0);
-                recordGooseEvent({ type: 'cache_hit', vulnId: sanitizedVulnId });
-                return;
-            }
-            // Notify webview that analysis is pending
-            sendToWebview({ type: 'gooseInsight', vulnId: sanitizedVulnId, data: { pending: true } });
-            // ===== PHASE 3: SECURE AI EXECUTION =====
-            console.log('🤖 Executing secure AI analysis with enterprise validation...');
-            // SECURITY: Use secure Goose execution with comprehensive validation
-            const abortController = new AbortController();
-            gooseAbortControllers.set(sanitizedVulnId, abortController);
-            const rawInsight = yield gooseLimiter.run(() => __awaiter(this, void 0, void 0, function* () {
-                if (abortController.signal.aborted) {
-                    throw new Error('Goose execution canceled');
-                }
-                return yield runSecureGooseWithRetry(context, projectRoot || process.cwd(), config.recipePath, abortController.signal, config.maxRetries, config.timeoutMs);
-            }));
-            gooseAbortControllers.delete(sanitizedVulnId);
-            const executionTimeMs = Date.now() - requestStart;
-            // ===== PHASE 4: OUTPUT VALIDATION & ENTERPRISE FORMATTING =====
-            console.log('🛡️ Validating AI output against enterprise security standards...');
-            // SECURITY: Validate AI output before caching
-            const validator = new validator_1.JsonSchemaValidator();
-            let parsedInsight = rawInsight;
-            if (typeof rawInsight === 'string') {
-                try {
-                    parsedInsight = JSON.parse(rawInsight);
-                }
-                catch (_g) {
-                    throw new Error('Invalid JSON format from Goose');
-                }
-            }
-            const obj = isRecord(parsedInsight) ? parsedInsight : null;
-            let validatedInsight;
-            let enterpriseInsight;
-            if (obj && obj.analysis !== undefined) {
-                validatedInsight = validator.validate(obj.analysis);
-                enterpriseInsight = Object.assign(Object.assign({}, obj), { analysis: validatedInsight });
-            }
-            else {
-                validatedInsight = validator.validate(parsedInsight);
-                enterpriseInsight = isRecord(validatedInsight) ? Object.assign({}, validatedInsight) : { analysis: validatedInsight };
-            }
-            const analysisRef = isRecord(enterpriseInsight.analysis) ? enterpriseInsight.analysis : enterpriseInsight;
-            const priorityScore = typeof analysisRef.priorityScore === 'number' ? analysisRef.priorityScore : undefined;
-            const recommendedActionsCount = Array.isArray(analysisRef.recommendedActions) ? analysisRef.recommendedActions.length : 0;
-            enterpriseInsight.accessibility = enterpriseInsight.accessibility || {
-                ariaLabel: `Security analysis for ${sanitizedPkgName} vulnerability`,
-                colorBlindFriendly: {
-                    priorityPattern: priorityScore !== undefined ?
-                        `Priority level ${priorityScore} out of 5` :
-                        'Priority assessment available',
-                },
-                keyboardHints: [
-                    'Use Tab to navigate between actions',
-                    'Press Enter to activate buttons',
-                    'Use arrow keys within action lists'
-                ],
-                screenReaderContent: {
-                    summary: `${sanitizedPkgName} vulnerability analysis complete with ${recommendedActionsCount} recommended actions`,
-                    priorityAnnouncement: priorityScore !== undefined ?
-                        `Priority score ${priorityScore} out of 5` :
-                        'Priority being calculated'
-                }
+        const obj = isRecord(parsedInsight) ? parsedInsight : null;
+        let validatedInsight;
+        let enterpriseInsight;
+        if (obj && obj.analysis !== undefined) {
+            validatedInsight = validator.validate(obj.analysis);
+            enterpriseInsight = {
+                ...obj,
+                analysis: validatedInsight
             };
-            enterpriseInsight.metadata = enterpriseInsight.metadata || {
-                securityValidated: true,
-                accessibilityCompliant: true,
-                processingTimestamp: new Date().toISOString(),
-                validationVersion: '1.0',
-                complianceLevel: 'Enterprise Ready',
-                recipeVersion: recipeVersion,
-                vulnId: sanitizedVulnId,
-                packageInfo: `${sanitizedPkgName}@${sanitizedVersion}`,
-                analysisTimestamp: new Date().toISOString(),
-                processingTime: '< 100ms', // Updated in real implementation
-                webviewReady: true,
-                htmlSafe: true,
-                accessibilityTested: true
-            };
-            // ===== PHASE 5: SECURE CACHING & DELIVERY =====
-            gooseCache.set(sanitizedVulnId, enterpriseInsight, contextHash, recipeVersion);
-            gooseMetrics.totalTimeMs += executionTimeMs;
-            sendToWebview({ type: 'gooseInsight', vulnId: sanitizedVulnId, data: enterpriseInsight });
-            logGooseMetrics(executionTimeMs);
-            recordGooseEvent({ type: 'success', vulnId: sanitizedVulnId, executionTimeMs });
-            savePersistentGooseCache();
-            // Enhanced security audit log with accessibility status
-            console.log(`✅ Enterprise AI analysis completed for ${sanitizedPkgName}@${sanitizedVersion}`);
-            console.log(`📊 Analysis includes: ${recommendedActionsCount} actions, priority ${priorityScore !== null && priorityScore !== void 0 ? priorityScore : 'TBD'}/5`);
-            console.log(`🔒 Security validation: PASSED | Accessibility: WCAG 2.1 AA | Format: Enterprise JSON`);
-            console.log(`♿ Accessibility features: Screen reader support, keyboard navigation, color-blind friendly design`);
         }
-        catch (err) {
-            console.error('❌ Secure Goose execution failed:', err);
-            gooseAbortControllers.delete(sanitizedVulnId);
-            const classified = classifyGooseError(err);
-            logGoose(`Goose error (${classified.type}): ${classified.message}`);
-            gooseMetrics.errors += 1;
-            logGooseMetrics(0);
-            recordGooseEvent({ type: 'error', vulnId: sanitizedVulnId, errorType: classified.type });
-            // Enhanced error reporting with security context
-            const secureErrorMessage = err instanceof Error
-                ? (err.message.includes('validation') ? 'AI output validation failed' : 'AI analysis temporarily unavailable')
-                : 'Unknown AI processing error';
-            sendToWebview({
-                type: 'gooseInsightError',
-                vulnId: sanitizedVulnId,
-                error: secureErrorMessage,
-                metadata: {
-                    timestamp: new Date().toISOString(),
-                    securityStatus: 'Error handled securely',
-                    originalPackage: `${sanitizedPkgName}@${sanitizedVersion}`,
-                    accessibilitySupport: true,
-                    errorScreenReaderText: `AI analysis failed for ${sanitizedPkgName}. ${secureErrorMessage}`
-                }
-            });
-            console.log(`🔒 Error handled securely for ${sanitizedPkgName}@${sanitizedVersion}`);
+        else {
+            validatedInsight = validator.validate(parsedInsight);
+            enterpriseInsight = isRecord(validatedInsight) ? { ...validatedInsight } : { analysis: validatedInsight };
         }
-    });
-}
-function runAuditWithLockfileFallback(projectRoot) {
-    return __awaiter(this, void 0, void 0, function* () {
-        try {
-            return yield runAudit(projectRoot);
-        }
-        catch (error) {
-            const message = error instanceof Error ? error.message : String(error);
-            const lockfileMissing = /ENOLOCK|requires an existing lockfile|loadVirtual requires existing shrinkwrap file/i.test(message);
-            if (!lockfileMissing) {
-                throw error;
+        const analysisRef = isRecord(enterpriseInsight.analysis) ? enterpriseInsight.analysis : enterpriseInsight;
+        const priorityScore = typeof analysisRef.priorityScore === 'number' ? analysisRef.priorityScore : undefined;
+        const recommendedActionsCount = Array.isArray(analysisRef.recommendedActions) ? analysisRef.recommendedActions.length : 0;
+        enterpriseInsight.accessibility = enterpriseInsight.accessibility || {
+            ariaLabel: `Security analysis for ${sanitizedPkgName} vulnerability`,
+            colorBlindFriendly: {
+                priorityPattern: priorityScore !== undefined ?
+                    `Priority level ${priorityScore} out of 5` :
+                    'Priority assessment available',
+            },
+            keyboardHints: [
+                'Use Tab to navigate between actions',
+                'Press Enter to activate buttons',
+                'Use arrow keys within action lists'
+            ],
+            screenReaderContent: {
+                summary: `${sanitizedPkgName} vulnerability analysis complete with ${recommendedActionsCount} recommended actions`,
+                priorityAnnouncement: priorityScore !== undefined ?
+                    `Priority score ${priorityScore} out of 5` :
+                    'Priority being calculated'
             }
-            // If the project has no lockfile, create one and retry
-            vscode.window.showInformationMessage('No lockfile found. Creating package-lock.json...');
-            yield execAsync('npm i --package-lock-only --ignore-scripts', { cwd: projectRoot });
-            return yield runAudit(projectRoot);
-        }
-    });
-}
-function runAudit(projectRoot) {
-    return __awaiter(this, void 0, void 0, function* () {
-        var _a;
-        try {
-            const { stdout } = yield execAsync('npm audit --json', { cwd: projectRoot });
-            return JSON.parse(stdout);
-        }
-        catch (error) {
-            const execError = error;
-            if (execError.stdout) {
-                return JSON.parse(execError.stdout);
+        };
+        enterpriseInsight.metadata = enterpriseInsight.metadata || {
+            securityValidated: true,
+            accessibilityCompliant: true,
+            processingTimestamp: new Date().toISOString(),
+            validationVersion: '1.0',
+            complianceLevel: 'Enterprise Ready',
+            recipeVersion: recipeVersion,
+            vulnId: sanitizedVulnId,
+            packageInfo: `${sanitizedPkgName}@${sanitizedVersion}`,
+            analysisTimestamp: new Date().toISOString(),
+            processingTime: '< 100ms', // Updated in real implementation
+            webviewReady: true,
+            htmlSafe: true,
+            accessibilityTested: true
+        };
+        // ===== PHASE 5: SECURE CACHING & DELIVERY =====
+        gooseCache.set(sanitizedVulnId, enterpriseInsight, contextHash, recipeVersion);
+        gooseMetrics.totalTimeMs += executionTimeMs;
+        sendToWebview({ type: 'gooseInsight', vulnId: sanitizedVulnId, data: enterpriseInsight });
+        logGooseMetrics(executionTimeMs);
+        recordGooseEvent({ type: 'success', vulnId: sanitizedVulnId, executionTimeMs });
+        savePersistentGooseCache();
+        // Enhanced security audit log with accessibility status
+        console.log(`✅ Enterprise AI analysis completed for ${sanitizedPkgName}@${sanitizedVersion}`);
+        console.log(`📊 Analysis includes: ${recommendedActionsCount} actions, priority ${priorityScore ?? 'TBD'}/5`);
+        console.log(`🔒 Security validation: PASSED | Accessibility: WCAG 2.1 AA | Format: Enterprise JSON`);
+        console.log(`♿ Accessibility features: Screen reader support, keyboard navigation, color-blind friendly design`);
+    }
+    catch (err) {
+        console.error('❌ Secure Goose execution failed:', err);
+        gooseAbortControllers.delete(sanitizedVulnId);
+        const classified = classifyGooseError(err);
+        logGoose(`Goose error (${classified.type}): ${classified.message}`);
+        gooseMetrics.errors += 1;
+        logGooseMetrics(0);
+        recordGooseEvent({ type: 'error', vulnId: sanitizedVulnId, errorType: classified.type });
+        // Enhanced error reporting with security context
+        const secureErrorMessage = err instanceof Error
+            ? (err.message.includes('validation') ? 'AI output validation failed' : 'AI analysis temporarily unavailable')
+            : 'Unknown AI processing error';
+        sendToWebview({
+            type: 'gooseInsightError',
+            vulnId: sanitizedVulnId,
+            error: secureErrorMessage,
+            metadata: {
+                timestamp: new Date().toISOString(),
+                securityStatus: 'Error handled securely',
+                originalPackage: `${sanitizedPkgName}@${sanitizedVersion}`,
+                accessibilitySupport: true,
+                errorScreenReaderText: `AI analysis failed for ${sanitizedPkgName}. ${secureErrorMessage}`
             }
-            const stderr = (_a = execError.stderr) === null || _a === void 0 ? void 0 : _a.trim();
-            throw new Error(stderr || execError.message);
+        });
+        console.log(`🔒 Error handled securely for ${sanitizedPkgName}@${sanitizedVersion}`);
+    }
+}
+function hasLockfile(projectRoot) {
+    const lockPaths = [
+        path.join(projectRoot, 'package-lock.json'),
+        path.join(projectRoot, 'yarn.lock'),
+        path.join(projectRoot, 'pnpm-lock.yaml')
+    ];
+    return lockPaths.some(p => fs.existsSync(p));
+}
+async function ensureLockfileExists(projectRoot) {
+    if (hasLockfile(projectRoot))
+        return;
+    vscode.window.showInformationMessage('No lockfile found. Creating package-lock.json...');
+    await execAsync('npm i --package-lock-only --ignore-scripts', { cwd: projectRoot });
+}
+async function runAuditWithLockfileFallback(projectRoot) {
+    await ensureLockfileExists(projectRoot);
+    try {
+        return await runAudit(projectRoot);
+    }
+    catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const lockfileMissing = /ENOLOCK|requires an existing lockfile|loadVirtual requires existing shrinkwrap file/i.test(message);
+        if (!lockfileMissing) {
+            throw error;
         }
-    });
+        // Retry: create lockfile and run audit again
+        vscode.window.showInformationMessage('No lockfile found. Creating package-lock.json...');
+        await execAsync('npm i --package-lock-only --ignore-scripts', { cwd: projectRoot });
+        return await runAudit(projectRoot);
+    }
+}
+async function runAudit(projectRoot) {
+    try {
+        const { stdout } = await execAsync('npm audit --json', { cwd: projectRoot });
+        return JSON.parse(stdout);
+    }
+    catch (error) {
+        const execError = error;
+        if (execError.stdout) {
+            return JSON.parse(execError.stdout);
+        }
+        const stderr = execError.stderr?.trim();
+        throw new Error(stderr || execError.message);
+    }
 }
 function getNonce() {
     const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -859,6 +880,7 @@ function getWebviewContent(webview) {
       <title>Vulnerability Visualizer</title>
       <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
       <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;700&display=swap" rel="stylesheet">
+      <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;700&display=swap" rel="stylesheet">
       <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'IBM Plex Mono', monospace; background: #1e1e1e; color: #F7F7F7; overflow: hidden; }
@@ -866,36 +888,85 @@ function getWebviewContent(webview) {
         #graph-container { width: 100%; height: 100%; transition: width 0.2s; position: absolute; top: 0; left: 0; z-index: 0; }
         #app.inspector-open #graph-container { width: 50%; }
         #metadata-panel {
-          position: absolute; top: 25px; left: 25px; z-index: 1;
-          background: rgba(37,37,38,0.9); backdrop-filter: blur(10px);
-          padding: 25px; border-radius: 8px; font-size: 14px;
+          position: absolute; top: 0; left: 0; z-index: 1;
+          background: rgba(30,30,30,0.4); backdrop-filter: blur(10px);
+          padding: 25px; border-radius: 0; font-size: 14px;
           line-height: 1.6; min-width: 180px;
-          pointer-events: none;
         }
         #metadata-panel .section { margin-bottom: 12px; }
         #metadata-panel .section-title { font-size: 14px; margin-bottom: 6px; }
-        #metadata-panel .item { font-size: 12px; color: #BBBBBB; }
+        #metadata-panel .item {
+          font-size: 12px; color: #BBBBBB;
+          cursor: pointer; padding: 2px 6px; margin: 0 -6px; border-radius: 4px;
+          transition: background 0.2s, color 0.2s; display: block;
+        }
+        #metadata-panel .item[data-severity] { cursor: pointer; }
+        #metadata-panel .item[data-severity]:hover { background: rgba(255,255,255,0.08); color: #F7F7F7; border-radius: 0; }
+        #metadata-panel .item:not([data-severity]) { cursor: default; }
+        #metadata-panel .item.severity-selected { color: #F7F7F7; }
+        #metadata-panel .item.severity-selected.severity-high,
+        #metadata-panel .item.severity-selected.severity-moderate { color: #000000; }
+        #metadata-panel .item.severity-selected.severity-critical { background: #B40E0E !important; border-radius: 0; }
+        #metadata-panel .item.severity-selected.severity-high { background: #F16621 !important; border-radius: 0; }
+        #metadata-panel .item.severity-selected.severity-moderate { background: #F19E21 !important; border-radius: 0; }
+        #metadata-panel .item.severity-selected.severity-low { background: #285AFF !important; border-radius: 0; }
+        #metadata-panel .item.severity-selected.severity-info { background: #555555 !important; border-radius: 0; }
         #inspector-panel {
           position: absolute; top: 0; right: 0; width: 50%; height: 100%;
           background: #252526; display: none; overflow-y: auto;
           border-left: 5px solid #F19E21; font-size: 14px;
+          font-family: 'IBM Plex Sans', sans-serif;
         }
         #inspector-panel.visible { display: block; }
+        #inspector-panel .inspector-header {
+          position: absolute; top: 0; left: 0; right: 0; height: 44px;
+          display: flex; align-items: center; justify-content: space-between;
+          padding: 0 12px; z-index: 5;
+        }
+        #inspector-panel .back-btn {
+          display: none; align-items: center; gap: 6px; cursor: pointer;
+          font-size: 15px; font-weight: 400; color: #FFFFFE; background: none; border: none;
+          font-family: 'IBM Plex Sans', sans-serif;
+        }
+        #inspector-panel .back-btn.visible { display: flex; }
+        #inspector-panel .back-btn:hover { text-decoration: underline; }
         #inspector-panel .close-btn {
           position: absolute; top: 12px; right: 12px; cursor: pointer;
-          color: #F7F7F7; font-size: 20px; padding: 4px;
+          color: #F7F7F7; font-size: 20px; padding: 4px; z-index: 10;
+        }
+        #inspector-panel .package-name.severity-pkg-name {
+          font-family: 'IBM Plex Sans', sans-serif; font-weight: bold; font-size: 20px;
         }
         #inspector-panel .content { padding: 20px; padding-top: 50px; }
         #inspector-panel .dep-type { color: #BBBBBB; font-size: 14px; margin-bottom: 8px; }
-        #inspector-panel .package-name { font-size: 18px; font-weight: bold; margin-bottom: 16px; }
+        #inspector-panel .package-name { font-family: 'IBM Plex Sans', sans-serif; font-size: 32px; font-weight: 400; margin-bottom: 16px; }
         #inspector-panel .vul-section { margin: 16px 0; padding-top: 12px; border-top: 1px solid rgba(247,247,247,0.5); }
+        #inspector-panel .vul-section.severity-inspector-vul-section { border-top: none; padding-top: 0; }
         #inspector-panel .vul-title { font-weight: bold; font-size: 20px; margin-bottom: 8px; }
         #inspector-panel .vul-summary { font-size: 15px; color: #BBBBBB; margin: 8px 0; max-height: 4.5em; overflow: hidden; }
         #inspector-panel .severity-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 12px 0; }
         #inspector-panel .severity-item .label { font-size: 14px; color: #BBBBBB; }
         #inspector-panel .severity-item .value { font-size: 15px; color: #F7F7F7; }
-        #inspector-panel .remediation { background: #1A1A1A; border: 1px solid rgba(247,247,247,0.2); padding: 12px; margin: 12px 0; border-radius: 4px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; }
-        #inspector-panel .copy-cmd { background: #21252E; padding: 8px 12px; font-size: 12px; border-radius: 4px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        #inspector-panel .remediation { background: #1A1A1A; border: 1px solid rgba(247,247,247,0.2); padding: 12px; margin: 12px 0; border-radius: 4px; display: grid; grid-template-columns: 1fr 1fr auto; gap: 12px; align-items: start; }
+        #inspector-panel .remediation-col { display: flex; flex-direction: column; gap: 4px; }
+        #inspector-panel .remediation-line { font-size: 15px; color: #F7F7F7; }
+        #inspector-panel .copy-cmd { font-family: 'IBM Plex Mono', monospace; background: #21252E; padding: 8px 12px; font-size: 12px; border-radius: 4px; display: flex; align-items: center; gap: 8px; cursor: pointer; }
+        #inspector-panel .copy-cmd.view-details-cmd { font-family: 'IBM Plex Sans', sans-serif; }
+        #inspector-panel .copy-cmd a { color: #0678CF; text-decoration: none; }
+        #inspector-panel .copy-cmd a:hover { text-decoration: underline; }
+        #inspector-panel .copy-cmd i,
+        .copy-after-btn i,
+        .action-item i { min-width: 1.2em; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        #inspector-panel .copy-cmd .copy-success-icon,
+        .copy-success-icon { color: #000000 !important; background: #22c55e; border-radius: 50%; padding: 2px; display: inline-flex; align-items: center; justify-content: center; min-width: 1.2em; width: 1.2em; }
+        .view-details-link { font-size: 15px; color: #BBBBBB; cursor: pointer; text-decoration: none; }
+        .view-details-link:hover { text-decoration: underline; }
+        .severity-info-row { display: flex; align-items: flex-start; gap: 8px; margin: 12px 0; font-size: 15px; color: #BBBBBB; }
+        .severity-info-row i { margin-top: 2px; flex-shrink: 0; }
+        .severity-info-row a { color: #0678CF; text-decoration: none; }
+        .severity-info-row a:hover { text-decoration: underline; }
+        .severity-info-row .severity-info-link { color: inherit; text-decoration: underline; }
+        .severity-info-row .severity-info-link:hover { color: inherit; }
         .zoom-controls {
           position: absolute; bottom: 20px; left: 20px;
           display: flex; flex-direction: column; gap: 4px;
@@ -1345,7 +1416,12 @@ function getWebviewContent(webview) {
     </head>
     <body>
       <div id="app">
-        <div id="graph-container"></div>
+        <div id="graph-container">
+          <div id="loading-state" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;color:#BBBBBB;">
+            <i class="bi bi-hourglass-split" style="font-size:32px;"></i>
+            <span style="font-size:16px;">Scanning packages...</span>
+          </div>
+        </div>
         <div id="metadata-panel"></div>
         <div id="goose-onboarding" class="hidden">
           <div><strong>Goose Tips</strong></div>
@@ -1353,7 +1429,10 @@ function getWebviewContent(webview) {
           <button id="dismiss-onboarding">Got it</button>
         </div>
         <div id="inspector-panel">
-          <span class="close-btn" id="close-inspector">&times;</span>
+          <div class="inspector-header">
+            <button class="back-btn" id="back-to-severity" type="button"><i class="bi bi-arrow-left"></i><span id="back-btn-label"></span></button>
+            <span class="close-btn" id="close-inspector">&times;</span>
+          </div>
           <div class="content" id="inspector-content"></div>
         </div>
         <div class="zoom-controls">
@@ -1385,11 +1464,17 @@ function getWebviewContent(webview) {
           critical: { bg: '#B40E0E', text: '#FFFFFF', icon: 'bi-exclamation-octagon-fill' },
           high: { bg: '#F16621', text: '#000000', icon: 'bi-exclamation-triangle' },
           moderate: { bg: '#F19E21', text: '#000000', icon: 'bi-triangle-fill' },
-          low: { bg: '#285AFF', text: '#FFFFFF', icon: 'bi-circle-fill' }
+          low: { bg: '#285AFF', text: '#FFFFFF', icon: 'bi-circle-fill' },
+          info: { bg: '#555555', text: '#FFFFFF', icon: 'bi-info-circle' }
         };
         const CVSS_AV = { N: 'Network', A: 'Adjacent', L: 'Local', P: 'Physical' };
+        const CVSS_AC = { L: 'Low', H: 'High' };
         const CVSS_PR = { N: 'None', L: 'Low', H: 'High' };
         const CVSS_UI = { N: 'None', R: 'Required' };
+        const CVSS_AV_PHRASE = { N: 'exploitable over the network', A: 'exploitable by systems on the same network', L: 'exploitable by a local system user', P: 'exploitable with physical device access' };
+        const CVSS_AC_PHRASE = { L: 'relatively easy to exploit', H: 'requiring specific conditions to exploit' };
+        const CVSS_PR_PHRASE = { N: 'requiring no privileges', L: 'requiring a low-privilege account', H: 'requiring high privileges' };
+        const CVSS_UI_PHRASE = { N: 'without user interaction', R: 'requiring user interaction' };
 
         let allNodes = [];
         let allNodeMap = {};
@@ -1398,16 +1483,54 @@ function getWebviewContent(webview) {
         let svgRef = null;
         let selectAndShowNodeFn = null;
         let blastZoneGrpRef = null;
+        let nodeGrpRef = null;
+        let lastSeverityInspector = null;
 
         window.addEventListener('message', event => {
           const msg = event.data;
-          if (msg.command === 'loadData') renderVisualization(msg.data);
+          if (msg.command === 'loadStatus' && msg.status) {
+            const loadingText = document.querySelector('#loading-state span');
+            if (loadingText) loadingText.textContent = msg.status;
+          }
+          else if (msg.command === 'loadData') {
+            const loadingEl = document.getElementById('loading-state');
+            if (loadingEl) loadingEl.remove();
+            try {
+              if (typeof d3 !== 'undefined') {
+                renderVisualization(msg.data);
+              } else {
+                document.getElementById('app').innerHTML = '<p style="color:#F16621;padding:20px;">Failed to load visualization (D3 not available). Please reload the scanner.</p>';
+              }
+            } catch (err) {
+              const errMsg = err instanceof Error ? err.message : String(err);
+              document.getElementById('app').innerHTML = '<p style="color:#F16621;padding:20px;">Visualization error: ' + escapeHtml(errMsg) + '</p>';
+            }
+          }
           else if (msg.command === 'loadError') {
+            const loadingEl = document.getElementById('loading-state');
+            if (loadingEl) loadingEl.remove();
             document.getElementById('app').innerHTML = '<p style="color:#F16621;padding:20px;">Scan failed: ' + (msg.error || 'Unknown') + '</p>';
           }
           else if (msg.type === 'gooseInsight') handleGooseInsight(msg.vulnId, msg.data);
           else if (msg.type === 'gooseInsightError') handleGooseInsightError(msg.vulnId, msg.error);
         });
+
+        function showCopyFeedback(containerEl) {
+          if (!containerEl) return;
+          const icon = containerEl.querySelector('i.bi-clipboard') || containerEl.querySelector('i[class*="clipboard"]') || containerEl.querySelector('i');
+          if (icon) {
+            const origClass = typeof icon.className === 'string' ? icon.className : (icon.className.baseVal || 'bi bi-clipboard');
+            icon.className = 'bi bi-check copy-success-icon';
+            setTimeout(() => { icon.className = origClass; }, 1200);
+          }
+        }
+
+        function copyWithFeedback(el) {
+          const cmd = el.dataset.cmd;
+          if (!cmd) return;
+          navigator.clipboard.writeText(cmd);
+          showCopyFeedback(el);
+        }
 
         function renderVisualization(data) {
           if (data && data.error) {
@@ -1471,27 +1594,125 @@ function getWebviewContent(webview) {
           document.getElementById('close-inspector').onclick = () => {
             document.getElementById('inspector-panel').classList.remove('visible');
             document.getElementById('app').classList.remove('inspector-open');
+            lastSeverityInspector = null;
+            document.getElementById('back-to-severity').classList.remove('visible');
+            document.querySelectorAll('#metadata-panel .item.severity-selected').forEach(el => el.classList.remove('severity-selected'));
             d3.selectAll('.link').classed('selected', false).classed('blast-radius', false);
-            nodeGrp.selectAll('g').select('circle').attr('stroke', 'none').attr('stroke-width', 0);
+            if (nodeGrpRef) nodeGrpRef.selectAll('g').select('circle').attr('stroke', 'none').attr('stroke-width', 0);
             if (blastZoneGrpRef) blastZoneGrpRef.selectAll('path').remove();
           };
+          document.getElementById('back-to-severity').onclick = () => {
+            if (lastSeverityInspector) showSeverityInspector(lastSeverityInspector);
+          };
+        }
+
+        function showSeverityInspector(severity) {
+          const packages = allNodes.filter(n => n.severity === severity);
+          if (packages.length === 0) return;
+          const totalVuln = packages.reduce((s, p) => s + p.vulCount, 0);
+          const totalDep = packages.reduce((s, p) => s + p.depCount, 0);
+          let bestVector = null;
+          let bestScore = -1;
+          packages.forEach(p => {
+            const viaItems = Array.isArray(p.data.via) ? p.data.via : [];
+            viaItems.forEach(v => {
+              if (v && typeof v === 'object' && v.cvss && v.cvss.vectorString) {
+                const sc = (v.cvss.score || 0);
+                if (sc > bestScore) { bestScore = sc; bestVector = v.cvss.vectorString; }
+              }
+            });
+          });
+          const cvssCopy = generateCVSSCopy(totalVuln, totalDep, bestVector);
+          const sevCap = severity.charAt(0).toUpperCase() + severity.slice(1);
+          const pkgWord = packages.length === 1 ? 'Package' : 'Packages';
+          let html = '<div class="dep-type">Vulnerabilities</div>';
+          html += '<div class="package-name">' + packages.length + ' ' + sevCap + ' Severity ' + pkgWord + '</div>';
+          html += '<div style="font-size:15px;color:#F7F7F7;margin-bottom:50px;line-height:1.5;">' + escapeHtml(cvssCopy) + '</div>';
+          html += '<hr style="border:none;border-top:1px solid #555;margin:12px 0;" />';
+          html += '<div class="severity-info-row"><i class="bi bi-info-circle"></i><span>Order is based on highest <a href="https://www.first.org/cvss/" target="_blank" class="severity-info-link">CVSS score</a> and total number of vulnerabilities.</span></div>';
+          html += '<div class="vul-section severity-inspector-vul-section">';
+          packages.sort((a, b) => {
+            let scoreA = 0, scoreB = 0;
+            (a.data.via || []).forEach(v => { if (v && v.cvss && v.cvss.score) scoreA = Math.max(scoreA, v.cvss.score); });
+            (b.data.via || []).forEach(v => { if (v && v.cvss && v.cvss.score) scoreB = Math.max(scoreB, v.cvss.score); });
+            if (scoreB !== scoreA) return scoreB - scoreA;
+            return (b.vulCount || 0) - (a.vulCount || 0);
+          });
+          packages.forEach(p => {
+            const v = p.data;
+            const fix = v.fixAvailable;
+            const upgradeTo = fix && typeof fix === 'object' && fix.version ? fix.version : (typeof fix === 'string' ? fix : fix === true ? 'latest' : null);
+            const fixCmd = upgradeTo ? 'npm install ' + p.name + '@' + upgradeTo : '';
+            const depCount = p.depCount || 0;
+            html += '<div style="border:1px solid rgba(247,247,247,0.35);padding:12px;margin:8px 0;border-radius:4px;">';
+            html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">';
+            html += '<span class="package-name severity-pkg-name" style="margin-bottom:0;">' + escapeHtml(p.name) + '</span>';
+            html += '<span class="view-details-link" data-action="view-package-details" data-pkg="' + escapeHtml(p.name) + '" data-severity="' + severity + '">View details</span>';
+            html += '</div>';
+            html += '<div class="remediation"><div class="remediation-col"><div class="remediation-line">Dependencies: ' + depCount + '</div><div class="remediation-line">Upgrade To: ' + (upgradeTo || '-') + '</div></div>';
+            html += '<div class="remediation-col"><div class="remediation-line">Type: ' + (fix && fix.isSemVerMajor ? 'SemVer Major' : 'SemVer') + '</div><div class="remediation-line">Resolves: ' + (fix && fix.resolves ? fix.resolves.length + ' vulnerabilities' : '-') + '</div></div>';
+            if (fixCmd) {
+              html += '<div class="copy-cmd" data-action="copy-cmd" data-cmd="' + fixCmd.replace(/"/g, '&quot;') + '"><span>' + escapeHtml(fixCmd) + '</span><i class="bi bi-clipboard"></i></div>';
+            } else {
+              html += '<div class="copy-cmd view-details-cmd" data-action="view-package-details" data-pkg="' + escapeHtml(p.name) + '" data-severity="' + severity + '"><span>See advisory</span><i class="bi bi-box-arrow-up-right"></i></div>';
+            }
+            html += '</div></div>';
+          });
+          html += '</div>';
+          document.getElementById('inspector-content').innerHTML = html;
+          document.getElementById('inspector-panel').classList.add('visible');
+          document.getElementById('app').classList.add('inspector-open');
+          document.getElementById('back-to-severity').classList.remove('visible');
+          const s = SEVERITY_STYLES[severity] || SEVERITY_STYLES.moderate;
+          document.getElementById('inspector-panel').style.borderLeftColor = s.bg;
+          document.querySelectorAll('#metadata-panel .item.severity-selected').forEach(el => el.classList.remove('severity-selected'));
+          const selItem = document.querySelector('#metadata-panel .item[data-severity="' + severity + '"]');
+          if (selItem) selItem.classList.add('severity-selected');
+          d3.selectAll('.link').classed('selected', false).classed('blast-radius', false);
+          if (nodeGrpRef) nodeGrpRef.selectAll('g').select('circle').attr('stroke', 'none').attr('stroke-width', 0);
+          if (blastZoneGrpRef) blastZoneGrpRef.selectAll('path').remove();
+          if (zoomRef && svgRef && packages.length > 0) {
+            const topPkg = packages[0];
+            const flat = allFlatNodes.find(n => n.id === topPkg.id);
+            if (flat) {
+              const container = document.getElementById('graph-container');
+              const cw = container.clientWidth;
+              const ch = container.clientHeight;
+              const centerX = cw / 2;
+              const centerY = ch / 2;
+              const k = 1;
+              const tx = centerX - flat.x * k;
+              const ty = centerY - flat.y * k;
+              d3.select(svgRef).call(zoomRef.transform, d3.zoomIdentity.translate(tx, ty).scale(k));
+            }
+          }
         }
 
         function renderMetadata(vulCounts, depCounts) {
           const totalVul = vulCounts.total || 0;
-          const html = '<div class="section"><div class="section-title">' + totalVul + ' Vulnerabilities</div>' +
-            '<div class="item">' + (vulCounts.info||0) + ' Info</div>' +
-            '<div class="item">' + (vulCounts.low||0) + ' Low</div>' +
-            '<div class="item">' + (vulCounts.moderate||0) + ' Moderate</div>' +
-            '<div class="item">' + (vulCounts.high||0) + ' High</div>' +
-            '<div class="item">' + (vulCounts.critical||0) + ' Critical</div></div>' +
-            '<div class="section"><div class="section-title">' + (depCounts.total||0) + ' Dependencies</div>' +
+          const severities = ['info', 'low', 'moderate', 'high', 'critical'];
+          let html = '<div class="section"><div class="section-title">' + totalVul + ' Vulnerabilities</div>';
+          severities.forEach(sev => {
+            const count = vulCounts[sev] || 0;
+            const cls = 'item' + (count > 0 ? ' severity-' + sev : '');
+            const attrs = count > 0 ? ' data-severity="' + sev + '" data-count="' + count + '"' : '';
+            html += '<div class="' + cls + '"' + attrs + '>' + count + ' ' + (sev.charAt(0).toUpperCase() + sev.slice(1)) + '</div>';
+          });
+          html += '</div><div class="section"><div class="section-title">' + (depCounts.total||0) + ' Dependencies</div>' +
             '<div class="item">' + (depCounts.prod||0) + ' prod</div>' +
             '<div class="item">' + (depCounts.dev||0) + ' dev</div>' +
             '<div class="item">' + (depCounts.optional||0) + ' optional</div>' +
             '<div class="item">' + (depCounts.peer||0) + ' peer</div>' +
             '<div class="item">' + (depCounts.peerOptional||0) + ' peer optional</div></div>';
           document.getElementById('metadata-panel').innerHTML = html;
+          document.getElementById('metadata-panel').style.pointerEvents = 'auto';
+          document.querySelectorAll('#metadata-panel .item[data-severity]').forEach(el => {
+            el.onclick = () => {
+              const sev = el.getAttribute('data-severity');
+              const count = parseInt(el.getAttribute('data-count') || '0', 10);
+              if (count > 0) showSeverityInspector(sev);
+            };
+          });
         }
 
         function renderGraph(nodes, links) {
@@ -1582,11 +1803,13 @@ function getWebviewContent(webview) {
             return result;
           }
 
+          nodeGrpRef = nodeGrp;
           selectAndShowNodeFn = function(d) {
+            document.querySelectorAll('#metadata-panel .item.severity-selected').forEach(el => el.classList.remove('severity-selected'));
             const blastIds = new Set(getBlastRadiusNodes(d.id));
             d3.selectAll('.link').classed('selected', l => (l.source && l.source.id === d.id) || (l.target && l.target.id === d.id))
               .classed('blast-radius', l => l.source && l.source.id === d.id && blastIds.has(l.target.id));
-            nodeGrp.selectAll('g').each(function(n) {
+            nodeGrpRef.selectAll('g').each(function(n) {
               const circle = d3.select(this).select('circle');
               const sel = n.id === d.id && n.isDirect;
               circle.attr('stroke', sel ? '#0678CF' : 'none').attr('stroke-width', sel ? 5 : 0);
@@ -1620,9 +1843,19 @@ function getWebviewContent(webview) {
             }
           };
 
-          node.on('click', (ev, d) => { selectAndShowNodeFn(d); });
+          node.on('click', (ev, d) => {
+            lastSeverityInspector = null;
+            document.getElementById('back-to-severity').classList.remove('visible');
+            selectAndShowNodeFn(d);
+          });
 
           window.selectNodeByName = function(name) {
+            const nd = allNodeMap[name] || allFlatNodes.find(n => n.id === name);
+            if (nd && selectAndShowNodeFn) selectAndShowNodeFn(nd);
+          };
+
+          window.selectNodeFromSeverity = function(name, severity) {
+            lastSeverityInspector = severity;
             const nd = allNodeMap[name] || allFlatNodes.find(n => n.id === name);
             if (nd && selectAndShowNodeFn) selectAndShowNodeFn(nd);
           };
@@ -1633,12 +1866,27 @@ function getWebviewContent(webview) {
           const m = vectorStr.match(/CVSS:3\\.1\\/([^\\s]+)/);
           if (!m) return null;
           const parts = {};
-          m[1].split('/').forEach(p => { const [k,v] = p.split(':'); parts[k] = v; });
+          m[1].split('/').forEach(p => { const [k,v] = p.split(':'); if (k && v) parts[k] = v; });
           return {
             av: CVSS_AV[parts.AV] || parts.AV,
+            ac: CVSS_AC[parts.AC] || parts.AC,
             pr: CVSS_PR[parts.PR] || parts.PR,
-            ui: CVSS_UI[parts.UI] || parts.UI
+            ui: CVSS_UI[parts.UI] || parts.UI,
+            parts
           };
+        }
+
+        function generateCVSSCopy(vulnCount, depCount, vectorStr) {
+          const parsed = vectorStr ? parseCVSS(vectorStr) : null;
+          if (!parsed || !parsed.parts) {
+            return 'Resolving ' + vulnCount + ' vulnerable package' + (vulnCount === 1 ? '' : 's') + ' protects ' + depCount + ' dependent package' + (depCount === 1 ? '' : 's') + '.';
+          }
+          const p = parsed.parts;
+          const avPhrase = CVSS_AV_PHRASE[p.AV] || 'exploitable';
+          const prPhrase = CVSS_PR_PHRASE[p.PR] || 'requiring privileges';
+          const uiPhrase = CVSS_UI_PHRASE[p.UI] || 'with user interaction';
+          const acPhrase = CVSS_AC_PHRASE[p.AC] || 'with varying complexity';
+          return 'Resolving ' + vulnCount + ' vulnerable package' + (vulnCount === 1 ? '' : 's') + ' protects ' + depCount + ' dependent package' + (depCount === 1 ? '' : 's') + ' from attacks that are ' + avPhrase + ', ' + prPhrase + ', ' + uiPhrase + ', and ' + acPhrase + '.';
         }
 
         function renderInspector(d) {
@@ -1745,9 +1993,15 @@ function getWebviewContent(webview) {
               const fix = v.fixAvailable;
               const upgradeTo = fix && typeof fix === 'object' && fix.version ? fix.version : (typeof fix === 'string' ? fix : fix === true ? 'latest' : null);
               const fixCmd = upgradeTo ? 'npm install ' + d.name + '@' + upgradeTo : '';
-              html += '<div class="remediation"><div><div class="label">Fix Available</div><div class="value">' + (fix ? 'Yes' : 'No') + '</div><div class="label">Upgrade To</div><div class="value">' + (upgradeTo || '-') + '</div></div>';
-              html += '<div><div class="label">Type</div><div class="value">' + (fix && fix.isSemVerMajor ? 'SemVer Major' : 'SemVer') + '</div><div class="label">Resolves</div><div class="value">' + (fix && fix.resolves ? fix.resolves.length + ' vulnerabilities' : '-') + '</div></div>';
-              html += '<div class="copy-cmd" data-cmd="' + (fixCmd || '').replace(/"/g, '&quot;') + '" data-action="copy-cmd"><span>' + (fixCmd || 'See advisory') + '</span><i class="bi bi-clipboard"></i></div></div>';
+              const advUrl = adv.url || '#';
+              html += '<div class="remediation"><div class="remediation-col"><div class="remediation-line">Fix Available: ' + (fix ? 'Yes' : 'No') + '</div><div class="remediation-line">Upgrade To: ' + (upgradeTo || '-') + '</div></div>';
+              html += '<div class="remediation-col"><div class="remediation-line">Type: ' + (fix && fix.isSemVerMajor ? 'SemVer Major' : 'SemVer') + '</div><div class="remediation-line">Resolves: ' + (fix && fix.resolves ? fix.resolves.length + ' vulnerabilities' : '-') + '</div></div>';
+              if (fixCmd) {
+                html += '<div class="copy-cmd" data-action="copy-cmd" data-cmd="' + fixCmd.replace(/"/g, '&quot;') + '"><span>' + escapeHtml(fixCmd) + '</span><i class="bi bi-clipboard"></i></div>';
+              } else {
+                html += '<div class="copy-cmd"><a href="' + escapeHtml(advUrl) + '" target="_blank" rel="noopener" style="color:#0678CF;text-decoration:none;">See advisory</a><i class="bi bi-box-arrow-up-right"></i></div>';
+              }
+              html += '</div>';
               if (adv.cwe && adv.cwe.length) {
                 html += '<div style="margin-top:12px;"><div style="font-size:18px;">Weakness Classification (CWE)</div>';
                 adv.cwe.forEach(cwe => {
@@ -1770,6 +2024,15 @@ function getWebviewContent(webview) {
           }
           
           document.getElementById('inspector-content').innerHTML = html;
+          const backBtn = document.getElementById('back-to-severity');
+          const label = document.getElementById('back-btn-label');
+          if (lastSeverityInspector) {
+            const sevCap = lastSeverityInspector.charAt(0).toUpperCase() + lastSeverityInspector.slice(1);
+            label.textContent = 'All ' + sevCap + ' Severities';
+            backBtn.classList.add('visible');
+          } else {
+            backBtn.classList.remove('visible');
+          }
         }
 
         function escapeHtml(str) {
@@ -2155,6 +2418,13 @@ function getWebviewContent(webview) {
               if (pkg) selectNodeByName(pkg);
               break;
             }
+            case 'view-package-details': {
+              event.preventDefault();
+              const pkg = target.getAttribute('data-pkg');
+              const sev = target.getAttribute('data-severity');
+              if (pkg && sev) selectNodeFromSeverity(pkg, sev);
+              break;
+            }
             case 'toggle-accordion': {
               const targetId = target.getAttribute('data-target');
               const body = targetId ? document.getElementById(targetId) : null;
@@ -2165,7 +2435,7 @@ function getWebviewContent(webview) {
             }
             case 'copy-cmd': {
               const cmd = target.getAttribute('data-cmd');
-              if (cmd) navigator.clipboard.writeText(cmd);
+              if (cmd) { navigator.clipboard.writeText(cmd); showCopyFeedback(target); }
               break;
             }
             case 'goose-cancel': {
@@ -2174,7 +2444,7 @@ function getWebviewContent(webview) {
             }
             case 'copy-action': {
               const text = target.getAttribute('data-action-text');
-              if (text) copyAction(text);
+              if (text) { copyAction(text); showCopyFeedback(target); }
               break;
             }
             case 'goose-feedback': {
@@ -2184,6 +2454,7 @@ function getWebviewContent(webview) {
             }
             case 'copy-after': {
               copyCodeFixAfter();
+              showCopyFeedback(target);
               break;
             }
             case 'apply-fix': {

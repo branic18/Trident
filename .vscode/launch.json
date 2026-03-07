@@ -9,6 +9,14 @@
         "${workspaceFolder}/out/**/*.js"
       ],
       "preLaunchTask": "npm: watch"
+    },
+    {
+      "type": "extensionHost",
+      "request": "launch",
+      "name": "Run Extension (no watch)",
+      "outFiles": [
+        "${workspaceFolder}/out/**/*.js"
+      ]
     }
   ]
 }

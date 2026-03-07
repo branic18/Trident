@@ -32,7 +32,7 @@ export class JsonSchemaValidator implements GooseVulnInsightValidator {
       recommendedActions: this.validateRecommendedActions(obj.recommendedActions),
       fixStyle: this.validateFixStyle(obj.fixStyle),
       devFacingSummary: this.validateDevSummary(obj.devFacingSummary),
-      codeFix: obj.codeFix ? this.validateCodeFix(obj.codeFix) : undefined
+      codeFix: this.safeValidateCodeFix(obj.codeFix)
     };
     
     // Apply content filtering
@@ -169,6 +169,17 @@ export class JsonSchemaValidator implements GooseVulnInsightValidator {
       description: this.validateCodeDescription(obj.description),
       warnings: this.validateWarnings(obj.warnings)
     };
+  }
+
+  private safeValidateCodeFix(codeFix: unknown): CodeFix | undefined {
+    if (!codeFix) return undefined;
+    try {
+      return this.validateCodeFix(codeFix);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`Dropping invalid codeFix: ${message}`);
+      return undefined;
+    }
   }
   
   private validateFilePath(filePath: unknown): string {

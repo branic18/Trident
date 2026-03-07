@@ -67,7 +67,7 @@
         },
         "trident.goose.timeoutMs": {
           "type": "number",
-          "default": 30000,
+          "default": 120000,
           "description": "Timeout in milliseconds for Goose execution."
         },
         "trident.goose.maxConcurrency": {

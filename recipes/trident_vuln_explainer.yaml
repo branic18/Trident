@@ -75,9 +75,11 @@ instructions: |
   - Score 1 (Info): CVSS 0, informational, deprecated packages, low business impact
 
   ## OUTPUT FORMAT
-  Return a JSON object with this enhanced schema for enterprise deployment:
+  Return a JSON object with this enhanced schema for enterprise deployment.
+  Do NOT include markdown, backticks, or any extra text outside the JSON.
+  If you cannot produce a safe code fix, omit the entire "codeFix" field.
 
-  ```json
+  Example schema (no fences, no prose outside JSON):
   {
     "validation": {
       "isValid": boolean,
@@ -86,24 +88,18 @@ instructions: |
     },
     "analysis": {
       "title": "string - concise vulnerability label",
-      "humanExplanation": "string - plain language description",  
+      "humanExplanation": "string - plain language description",
       "impactOnUsers": "string - project-specific impact assessment",
       "priorityScore": "number - 1-5 score with algorithm above",
       "priorityReason": "string - clear scoring rationale",
       "recommendedActions": ["string array - actionable steps"],
       "fixStyle": "string - upgrade classification",
-      "devFacingSummary": "string - developer summary for UI",
-      "codeFix": {
-        "filePath": "string",
-        "before": "string", 
-        "after": "string",
-        "description": "string",
-        "warnings": ["string array"]
-      }
+      "devFacingSummary": "string - developer summary for UI"
+      // optional: "codeFix" (omit if unsure)
     },
     "accessibility": {
       "ariaLabel": "string - screen reader label",
-      "ariaDescription": "string - extended description", 
+      "ariaDescription": "string - extended description",
       "priorityAltText": "string - text alternative to colors",
       "keyboardHints": ["string array - navigation suggestions"],
       "readingOrder": ["string array - content sequence"],
@@ -126,7 +122,6 @@ instructions: |
       "performanceOptimized": boolean
     }
   }
-  ```
 
   Process incrementally through all 4 phases and return the complete enterprise-ready analysis.
 

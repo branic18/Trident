@@ -21,7 +21,7 @@ class JsonSchemaValidator {
             recommendedActions: this.validateRecommendedActions(obj.recommendedActions),
             fixStyle: this.validateFixStyle(obj.fixStyle),
             devFacingSummary: this.validateDevSummary(obj.devFacingSummary),
-            codeFix: obj.codeFix ? this.validateCodeFix(obj.codeFix) : undefined
+            codeFix: this.safeValidateCodeFix(obj.codeFix)
         };
         // Apply content filtering
         return this.filterSuspiciousContent(insight);
@@ -127,6 +127,18 @@ class JsonSchemaValidator {
             description: this.validateCodeDescription(obj.description),
             warnings: this.validateWarnings(obj.warnings)
         };
+    }
+    safeValidateCodeFix(codeFix) {
+        if (!codeFix)
+            return undefined;
+        try {
+            return this.validateCodeFix(codeFix);
+        }
+        catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            console.warn(`Dropping invalid codeFix: ${message}`);
+            return undefined;
+        }
     }
     validateFilePath(filePath) {
         if (typeof filePath !== 'string') {

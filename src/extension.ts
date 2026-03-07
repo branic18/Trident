@@ -226,6 +226,62 @@ type VulnerabilitySelection = {
     codeSnippet?: string | null;
 };
 
+type FixInfo = {
+    type: "auto" | "manual" | "none";
+    name?: string;
+    version?: string;
+    isSemVerMajor?: boolean;
+    resolvesCount?: number;
+};
+
+type CodeSnippet = {
+    filePath: string;
+    startLine: number;
+    endLine: number;
+    before: string;
+};
+
+function normalizeSeverity(value: unknown): "low" | "moderate" | "high" | "critical" {
+    return value === "low" || value === "moderate" || value === "high" || value === "critical"
+        ? value
+        : "moderate";
+}
+
+function normalizeEnvironment(value: unknown): "dev" | "staging" | "prod" | undefined {
+    return value === "dev" || value === "staging" || value === "prod" ? value : undefined;
+}
+
+function normalizePaths(value: unknown): string[][] {
+    if (!Array.isArray(value)) return [];
+    if (value.every((item) => typeof item === "string")) {
+        return (value as string[]).map((item) => [item]);
+    }
+    if (value.every((item) => Array.isArray(item) && item.every((entry) => typeof entry === "string"))) {
+        return value as string[][];
+    }
+    return [];
+}
+
+function normalizeFixInfo(value: unknown): FixInfo {
+    if (!isRecord(value)) return { type: "none" };
+    const type = value.type === "auto" || value.type === "manual" || value.type === "none" ? value.type : "none";
+    const name = typeof value.name === "string" ? value.name : undefined;
+    const version = typeof value.version === "string" ? value.version : undefined;
+    const isSemVerMajor = typeof value.isSemVerMajor === "boolean" ? value.isSemVerMajor : undefined;
+    const resolvesCount = typeof value.resolvesCount === "number" ? value.resolvesCount : undefined;
+    return { type, name, version, isSemVerMajor, resolvesCount };
+}
+
+function normalizeCodeSnippet(value: unknown): CodeSnippet | undefined {
+    if (!isRecord(value)) return undefined;
+    const filePath = typeof value.filePath === "string" ? value.filePath : undefined;
+    const startLine = typeof value.startLine === "number" ? value.startLine : undefined;
+    const endLine = typeof value.endLine === "number" ? value.endLine : undefined;
+    const before = typeof value.before === "string" ? value.before : undefined;
+    if (!filePath || startLine === undefined || endLine === undefined || !before) return undefined;
+    return { filePath, startLine, endLine, before };
+}
+
 async function runNpmAudit(panel: vscode.WebviewPanel, projectRoot: string): Promise<void> {
     panel.webview.html = getWebviewContent(panel.webview);
 
@@ -641,7 +697,7 @@ export async function onVulnSelected(vuln: VulnerabilitySelection) {
             vulnId: sanitizedVulnId,
             pkgName: sanitizedPkgName,
             pkgVersion: sanitizedVersion,
-            npmSeverity: vuln.severity,
+            npmSeverity: normalizeSeverity(vuln.severity),
             cvssScore: vuln.cvss?.score ?? null,
             cvssVector: vuln.cvss?.vectorString ?? null,
             cweIds: vuln.cweIds || [],
@@ -649,13 +705,13 @@ export async function onVulnSelected(vuln: VulnerabilitySelection) {
             githubAdvisoryId: vuln.githubAdvisoryId,
             githubSummary: vuln.githubSummary,
             githubUrl: vuln.githubUrl,
-            paths: vuln.paths || [],
+            paths: normalizePaths(vuln.paths),
             usedInFiles: config.dataMode === 'metadata' ? [] : (vuln.usedInFiles || []), // Will be auto-detected if empty/missing
-            environment: vuln.environment || 'unknown', // Will be auto-detected if missing
+            environment: normalizeEnvironment(vuln.environment), // Will be auto-detected if missing
             projectType: 'web-app', // Enterprise project classification
             projectRoot: projectRoot, // Enable secure file analysis
-            fixInfo: vuln.fixAvailable || { type: 'none' },
-            codeSnippet: config.dataMode === 'metadata' ? null : (vuln.codeSnippet || null),
+            fixInfo: normalizeFixInfo(vuln.fixAvailable),
+            codeSnippet: config.dataMode === 'metadata' ? undefined : normalizeCodeSnippet(vuln.codeSnippet),
         });
 
         console.log(`📋 Context built with ${Object.keys(context).length} security-validated fields`);

@@ -34,6 +34,7 @@
   "license": "ISC",
   "type": "commonjs",
   "activationEvents": [
+    "onView:vulnerabilityView",
     "onCommand:vulnerability-scanner.scan",
     "onCommand:vulnerability-scanner.showLogs"
   ],
@@ -105,6 +106,10 @@
       {
         "command": "vulnerability-scanner.showLogs",
         "title": "Show Audit Logs"
+      },
+      {
+        "command": "vulnerabilityView.openWebview",
+        "title": "Run Scanner"
       }
     ]
   },

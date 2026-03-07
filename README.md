@@ -26,6 +26,20 @@ Development
 8. Select 'Start Scanner' under the 'Vulnerable Packages' view under 'Explorer'
 9. This should open the canvas!
 
+## 🤖 Goose Setup (User-Configured)
+This extension expects Goose to be installed locally and configured by the user.
+
+Required:
+1. Install Goose CLI and ensure `goose` is on your PATH.
+2. Configure provider credentials (OpenAI example):
+   - Set `OPENAI_API_KEY` in your shell or env file.
+3. (Optional) Configure recipe path in VS Code Settings:
+   - `trident.goose.recipePath` (default: `./recipes/trident_vuln_explainer.yaml`)
+
+Troubleshooting:
+- “Goose CLI not found” → install Goose and verify `goose --version`.
+- “Invalid JSON format from Goose” → confirm recipe path and provider credentials.
+
 
 Installation (1 Command)
 Requirements: [e.g., Node 18+, Python 3.9+, API keys].
@@ -57,13 +71,13 @@ Purpose
 Link to Documentation
 Decision Log
 Technical choices & tradeoffs.
-[Link to /docs/DECISION_LOG.md].
+[Link to DECISION_LOG.md].
 Risk Log
 Issues identified & fixed.
-[Link to /docs/RISK_LOG.md].
+[Link to RISK_LOG.md].
 Evidence Log
 Sources, assets, & attributions.
-[Link to /docs/EVIDENCE_LOG.md].
+[Link to EVIDENCE_LOG.md].
 
 
 ## 🧪 Testing & Known Issues

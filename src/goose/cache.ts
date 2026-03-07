@@ -100,6 +100,10 @@ export class GooseCache<T> {
     this.evictIfNeeded();
   }
 
+  clearAll(): void {
+    this.entries.clear();
+  }
+
   pruneByKeys(validKeys: Set<string>): void {
     for (const key of this.entries.keys()) {
       if (!validKeys.has(key)) {

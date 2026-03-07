@@ -36,7 +36,8 @@
   "activationEvents": [
     "onView:vulnerabilityView",
     "onCommand:vulnerability-scanner.scan",
-    "onCommand:vulnerability-scanner.showLogs"
+    "onCommand:vulnerability-scanner.showLogs",
+    "onCommand:trident.openApiKeySettings"
   ],
   "contributes": {
     "views": {
@@ -95,6 +96,16 @@
           "type": "boolean",
           "default": true,
           "description": "Enable workspace-shared Goose cache under .trident/ (opt-in)."
+        },
+        "trident.goose.provider": {
+          "type": "string",
+          "default": "openrouter",
+          "description": "AI provider for Goose (e.g. openrouter, openai, anthropic)."
+        },
+        "trident.goose.model": {
+          "type": "string",
+          "default": "openai/gpt-5.1",
+          "description": "Model ID for Goose (e.g. openai/gpt-5.1 for OpenRouter)."
         }
       }
     },
@@ -110,6 +121,10 @@
       {
         "command": "vulnerabilityView.openWebview",
         "title": "Run Scanner"
+      },
+      {
+        "command": "trident.openApiKeySettings",
+        "title": "API Key"
       }
     ]
   },

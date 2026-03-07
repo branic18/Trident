@@ -138,6 +138,7 @@ function getMinimalEnvironment() {
         // Provider auth/config (required for Goose to run in extension host)
         'OPENAI_API_KEY', 'OPENAI_ORG_ID',
         'ANTHROPIC_API_KEY',
+        'OPENROUTER_API_KEY',
         'GOOSE_PROVIDER', 'GOOSE_MODEL'
     ];
     const minimalEnv = {};
@@ -451,12 +452,13 @@ async function executeWithRetry(operation, maxRetries = 2, baseDelay = 1000) {
  * Secure Goose execution using temporary files
  * Prevents command line argument injection
  */
-async function secureGooseExecution(vulnContext, workingDir, recipePath, signal, timeoutMs = 30000) {
+async function secureGooseExecution(vulnContext, workingDir, recipePath, signal, timeoutMs = 30000, envOverrides) {
     try {
         // Sanitize working directory
         const safeWorkingDir = sanitizeWorkingDirectory(workingDir);
-        // Get minimal environment
-        const env = getMinimalEnvironment();
+        // Get minimal environment, merged with overrides (API key, provider, model)
+        const baseEnv = getMinimalEnvironment();
+        const env = envOverrides ? { ...baseEnv, ...envOverrides } : baseEnv;
         // Serialize params for Goose CLI
         const vulnContextJson = JSON.stringify(vulnContext);
         const resolvedRecipePath = resolveRecipePath(recipePath, safeWorkingDir);

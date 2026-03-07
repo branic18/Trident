@@ -117,7 +117,12 @@ export function activate(context: vscode.ExtensionContext) {
         treeViewProvider.showLogs();
     });
 
-    context.subscriptions.push(scanCommand, openWebviewCommand, showLogsCommand);
+    // Register command to open API Key settings
+    const apiKeyCommand = vscode.commands.registerCommand('trident.openApiKeySettings', () => {
+        openApiKeySettings(context);
+    });
+
+    context.subscriptions.push(scanCommand, openWebviewCommand, showLogsCommand, apiKeyCommand);
 }
 
 let lastAuditPayload: unknown = null;
@@ -157,7 +162,8 @@ class VulnerabilityTreeViewProvider implements vscode.TreeDataProvider<Vulnerabi
         if (element) {
             if (element.id === 'run-scanner') {
                 return Promise.resolve([
-                    new VulnerabilityItem("Logs", "vulnerability-scanner.showLogs", "logs")
+                    new VulnerabilityItem("Logs", "vulnerability-scanner.showLogs", "logs"),
+                    new VulnerabilityItem("API Key", "trident.openApiKeySettings", "api-key")
                 ]);
             }
             return Promise.resolve([]);
@@ -175,6 +181,77 @@ function escapeHtml(str: string): string {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;');
+}
+
+const TRIDENT_OPENROUTER_API_KEY = 'trident.openrouter.apiKey';
+
+async function openApiKeySettings(context: vscode.ExtensionContext): Promise<void> {
+    const panel = vscode.window.createWebviewPanel(
+        'tridentApiKeySettings',
+        'API Key',
+        vscode.ViewColumn.One,
+        { enableScripts: true }
+    );
+
+    const hasKey = !!(await context.secrets.get(TRIDENT_OPENROUTER_API_KEY));
+    panel.webview.html = getApiKeySettingsWebviewContent(hasKey);
+
+    panel.webview.onDidReceiveMessage(async (msg) => {
+        if (msg.command === 'saveApiKey' && typeof msg.apiKey === 'string') {
+            await context.secrets.store(TRIDENT_OPENROUTER_API_KEY, msg.apiKey.trim());
+            vscode.window.showInformationMessage('API key saved securely.');
+            panel.webview.html = getApiKeySettingsWebviewContent(true);
+        }
+    });
+}
+
+function getApiKeySettingsWebviewContent(hasKey: boolean): string {
+    const keyStatus = hasKey ? 'API key is configured.' : 'No API key configured.';
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>API Key</title>
+  <style>
+    body { font-family: 'IBM Plex Sans', -apple-system, sans-serif; background: #1e1e1e; color: #F7F7F7; padding: 24px; line-height: 1.6; max-width: 560px; }
+    h2 { font-size: 18px; margin-bottom: 16px; color: #F7F7F7; }
+    p { font-size: 14px; color: #BBBBBB; margin-bottom: 16px; }
+    .provider { font-size: 14px; color: #BBBBBB; margin: 12px 0 4px 0; }
+    .provider strong { color: #F7F7F7; }
+    .label { font-size: 14px; color: #F7F7F7; margin: 20px 0 8px 0; display: block; }
+    textarea { width: 100%; min-height: 80px; padding: 12px; background: #252526; border: 1px solid #555; border-radius: 4px; color: #F7F7F7; font-family: inherit; font-size: 13px; resize: vertical; box-sizing: border-box; }
+    textarea:focus { outline: none; border-color: #0678CF; }
+    textarea::placeholder { color: #666; }
+    button { background: #0678CF; color: #F7F7F7; border: none; padding: 10px 20px; border-radius: 4px; font-size: 14px; cursor: pointer; margin-top: 12px; }
+    button:hover { background: #0568b8; }
+    .status { font-size: 12px; color: #22c55e; margin-top: 8px; }
+    .note { font-size: 12px; color: #888; margin-top: 16px; font-style: italic; }
+  </style>
+</head>
+<body>
+  <h2>API Key</h2>
+  <p>Configure your AI model providers by adding their API keys. Your keys are stored securely and encrypted locally.</p>
+  <p class="note">(For V1 the options are pre-selected for you)</p>
+  <div class="provider"><strong>Pre-selected provider:</strong> OpenRouter</div>
+  <div class="provider"><strong>Pre-selected model:</strong> OpenAI 5.1</div>
+  <label class="label" for="api-key">Enter API key</label>
+  <textarea id="api-key" placeholder="Paste your OpenRouter API key here" rows="3"></textarea>
+  <button id="save-btn">Save</button>
+  <div class="status" id="status">${escapeHtml(keyStatus)}</div>
+  <script>
+    const vscode = acquireVsCodeApi();
+    document.getElementById('save-btn').addEventListener('click', () => {
+      const key = document.getElementById('api-key').value.trim();
+      if (key) {
+        vscode.postMessage({ command: 'saveApiKey', apiKey: key });
+      } else {
+        alert('Please enter an API key.');
+      }
+    });
+  </script>
+</body>
+</html>`;
 }
 
 class VulnerabilityItem extends vscode.TreeItem {
@@ -282,12 +359,31 @@ function normalizeCodeSnippet(value: unknown): CodeSnippet | undefined {
     return { filePath, startLine, endLine, before };
 }
 
+const NPM_AUDIT_TIMEOUT_MS = 90_000;
+const NPM_INSTALL_TIMEOUT_MS = 120_000;
+
 async function runNpmAudit(panel: vscode.WebviewPanel, projectRoot: string): Promise<void> {
     panel.webview.html = getWebviewContent(panel.webview);
+
+    gooseCache.clearAll();
+    savePersistentGooseCache();
+
+    await new Promise<void>((resolve) => {
+        const timeout = setTimeout(resolve, 3000);
+        const disposable = panel.webview.onDidReceiveMessage((msg: { command?: string }) => {
+            if (msg?.command === 'webviewReady') {
+                clearTimeout(timeout);
+                disposable.dispose();
+                resolve();
+            }
+        });
+    });
 
     try {
         if (!hasLockfile(projectRoot)) {
             panel.webview.postMessage({ command: 'loadStatus', status: 'Creating lockfile...' });
+        } else {
+            panel.webview.postMessage({ command: 'loadStatus', status: 'Running npm audit...' });
         }
         const auditResults = await runAuditWithLockfileFallback(projectRoot);
         const auditError = getAuditError(auditResults);
@@ -482,6 +578,17 @@ async function runSecureGooseWithRetry(
     maxRetries: number,
     timeoutMs: number
 ): Promise<string> {
+    const gooseConfig = vscode.workspace.getConfiguration('trident.goose');
+    const provider = gooseConfig.get<string>('provider', 'openrouter');
+    const model = gooseConfig.get<string>('model', 'openai/gpt-5.1');
+    const envOverrides: NodeJS.ProcessEnv = {
+        GOOSE_PROVIDER: provider,
+        GOOSE_MODEL: model
+    };
+    if (provider === 'openrouter' && extensionContext) {
+        const apiKey = await extensionContext.secrets.get(TRIDENT_OPENROUTER_API_KEY);
+        if (apiKey) envOverrides.OPENROUTER_API_KEY = apiKey;
+    }
     let attempt = 0;
     let lastError: unknown = null;
     const max = Math.max(0, Math.min(3, maxRetries));
@@ -490,7 +597,7 @@ async function runSecureGooseWithRetry(
             throw new Error('Goose execution canceled');
         }
         try {
-            return await secureGooseExecution(context, workingDir, recipePath, signal, timeoutMs);
+            return await secureGooseExecution(context, workingDir, recipePath, signal, timeoutMs, envOverrides);
         } catch (err) {
             lastError = err;
             const { type } = classifyGooseError(err);
@@ -878,7 +985,15 @@ function hasLockfile(projectRoot: string): boolean {
 async function ensureLockfileExists(projectRoot: string): Promise<void> {
     if (hasLockfile(projectRoot)) return;
     vscode.window.showInformationMessage('No lockfile found. Creating package-lock.json...');
-    await execAsync('npm i --package-lock-only --ignore-scripts', { cwd: projectRoot });
+    try {
+        await execAsync('npm i --package-lock-only --ignore-scripts', {
+            cwd: projectRoot,
+            timeout: NPM_INSTALL_TIMEOUT_MS
+        });
+    } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        throw new Error(`Lockfile creation failed (timeout ${NPM_INSTALL_TIMEOUT_MS / 1000}s): ${msg}`);
+    }
 }
 
 async function runAuditWithLockfileFallback(projectRoot: string): Promise<unknown> {
@@ -899,14 +1014,20 @@ async function runAuditWithLockfileFallback(projectRoot: string): Promise<unknow
         vscode.window.showInformationMessage(
             'No lockfile found. Creating package-lock.json...'
         );
-        await execAsync('npm i --package-lock-only --ignore-scripts', { cwd: projectRoot });
+        await execAsync('npm i --package-lock-only --ignore-scripts', {
+            cwd: projectRoot,
+            timeout: NPM_INSTALL_TIMEOUT_MS
+        });
         return await runAudit(projectRoot);
     }
 }
 
 async function runAudit(projectRoot: string): Promise<unknown> {
     try {
-        const { stdout } = await execAsync('npm audit --json', { cwd: projectRoot });
+        const { stdout } = await execAsync('npm audit --json', {
+            cwd: projectRoot,
+            timeout: NPM_AUDIT_TIMEOUT_MS
+        });
         return JSON.parse(stdout);
     } catch (error: unknown) {
         const execError = error as { stdout?: string; stderr?: string; message?: string };
@@ -929,6 +1050,9 @@ function getNonce(): string {
 
 function getWebviewContent(webview: vscode.Webview): string {
     const nonce = getNonce();
+    const d3Script = extensionContext
+        ? webview.asWebviewUri(vscode.Uri.joinPath(extensionContext.extensionUri, 'node_modules', 'd3', 'dist', 'd3.min.js')).toString()
+        : 'https://d3js.org/d3.v7.min.js';
     const csp = [
         "default-src 'none'",
         `img-src ${webview.cspSource} https: data:`,
@@ -1488,9 +1612,46 @@ function getWebviewContent(webview: vscode.Webview): string {
           <button class="zoom-btn" id="zoom-out">−</button>
         </div>
       </div>
-      <script nonce="${nonce}" src="https://d3js.org/d3.v7.min.js"></script>
       <script nonce="${nonce}">
-        const vscode = acquireVsCodeApi();
+        (function() {
+          window.__vscodeApi = acquireVsCodeApi();
+          window.__pendingLoadData = null;
+          window.__pendingLoadStatus = null;
+          window.__pendingLoadError = null;
+          window.__handleLoadData = function(data) {
+            if (typeof window.__renderVisualization === 'function') {
+              var loadingEl = document.getElementById('loading-state');
+              if (loadingEl) loadingEl.remove();
+              try { window.__renderVisualization(data); } catch (e) {
+                document.getElementById('app').innerHTML = '<p style="color:#F16621;">Error: ' + (e.message || e) + '</p>';
+              }
+            } else {
+              window.__pendingLoadData = data;
+              var el = document.querySelector('#loading-state span');
+              if (el) el.textContent = 'Preparing visualization...';
+            }
+          };
+          window.__handleLoadError = function(err) {
+            var loadingEl = document.getElementById('loading-state');
+            if (loadingEl) loadingEl.remove();
+            document.getElementById('app').innerHTML = '<p style="color:#F16621;padding:20px;">Scan failed: ' + (err || 'Unknown') + '</p>';
+          };
+          window.addEventListener('message', function(event) {
+            var msg = event.data;
+            if (!msg) return;
+            if (msg.command === 'loadStatus' && msg.status) {
+              var el = document.querySelector('#loading-state span');
+              if (el) el.textContent = msg.status;
+            }
+            if (msg.command === 'loadData') { window.__handleLoadData(msg.data); }
+            if (msg.command === 'loadError') { window.__handleLoadError(msg.error); }
+          });
+          window.__vscodeApi.postMessage({ command: 'webviewReady' });
+        })();
+      </script>
+      <script nonce="${nonce}" src="${d3Script}"></script>
+      <script nonce="${nonce}">
+        const vscode = window.__vscodeApi;
         ${ACCESSIBILITY_JS}
         if (typeof setupAccessibleNavigation === 'function') setupAccessibleNavigation();
         const onboardingKey = 'trident.goose.onboardingDismissed';
@@ -1534,32 +1695,26 @@ function getWebviewContent(webview: vscode.Webview): string {
         let nodeGrpRef = null;
         let lastSeverityInspector = null;
 
+        window.__renderVisualization = function(data) {
+          try {
+            if (typeof d3 !== 'undefined') {
+              renderVisualization(data);
+            } else {
+              document.getElementById('app').innerHTML = '<p style="color:#F16621;padding:20px;">Failed to load visualization (D3 not available). Please reload the scanner.</p>';
+            }
+          } catch (err) {
+            const errMsg = err instanceof Error ? err.message : String(err);
+            document.getElementById('app').innerHTML = '<p style="color:#F16621;padding:20px;">Visualization error: ' + escapeHtml(errMsg) + '</p>';
+          }
+        };
+        if (window.__pendingLoadData) {
+          window.__handleLoadData(window.__pendingLoadData);
+          window.__pendingLoadData = null;
+        }
+
         window.addEventListener('message', event => {
           const msg = event.data;
-          if (msg.command === 'loadStatus' && msg.status) {
-            const loadingText = document.querySelector('#loading-state span');
-            if (loadingText) loadingText.textContent = msg.status;
-          }
-          else if (msg.command === 'loadData') {
-            const loadingEl = document.getElementById('loading-state');
-            if (loadingEl) loadingEl.remove();
-            try {
-              if (typeof d3 !== 'undefined') {
-                renderVisualization(msg.data);
-              } else {
-                document.getElementById('app').innerHTML = '<p style="color:#F16621;padding:20px;">Failed to load visualization (D3 not available). Please reload the scanner.</p>';
-              }
-            } catch (err) {
-              const errMsg = err instanceof Error ? err.message : String(err);
-              document.getElementById('app').innerHTML = '<p style="color:#F16621;padding:20px;">Visualization error: ' + escapeHtml(errMsg) + '</p>';
-            }
-          }
-          else if (msg.command === 'loadError') {
-            const loadingEl = document.getElementById('loading-state');
-            if (loadingEl) loadingEl.remove();
-            document.getElementById('app').innerHTML = '<p style="color:#F16621;padding:20px;">Scan failed: ' + (msg.error || 'Unknown') + '</p>';
-          }
-          else if (msg.type === 'gooseInsight') handleGooseInsight(msg.vulnId, msg.data);
+          if (msg.type === 'gooseInsight') handleGooseInsight(msg.vulnId, msg.data);
           else if (msg.type === 'gooseInsightError') handleGooseInsightError(msg.vulnId, msg.error);
         });
 
@@ -1599,6 +1754,9 @@ function getWebviewContent(webview: vscode.Webview): string {
             return;
           }
 
+          // Build a set of all package names that have their own vuln entry
+          const vulnEntryNames = new Set(Object.keys(vulns));
+
           const nodes = [];
           const nodeMap = {};
           const links = [];
@@ -1608,6 +1766,7 @@ function getWebviewContent(webview: vscode.Webview): string {
             return via.filter(x => x && typeof x === 'object' && (x.severity || x.url || x.title));
           }
 
+          // First pass: create nodes for every vuln entry (authoritative)
           for (const [name, v] of Object.entries(vulns)) {
             const vv = v;
             const advisories = getAdvisories(vv.via);
@@ -1616,26 +1775,31 @@ function getWebviewContent(webview: vscode.Webview): string {
             const effects = vv.effects || [];
             const depCount = effects.length;
             const vulCount = advisories.length || 1;
-            nodes.push({ id: name, name, severity, depCount, vulCount, isDirect: vv.isDirect, data: vv });
-            nodeMap[name] = nodes[nodes.length - 1];
+            const node = { id: name, name, severity, depCount, vulCount, isDirect: vv.isDirect, data: vv };
+            nodes.push(node);
+            nodeMap[name] = node;
+          }
+
+          // Second pass: create links and effect-only nodes (packages not in vulns)
+          for (const [name, v] of Object.entries(vulns)) {
+            const vv = v;
+            const effects = vv.effects || [];
             effects.forEach(e => {
               const targetName = typeof e === 'string' ? e : (e && e.name) || e;
               if (!targetName) return;
               if (!nodeMap[targetName]) {
-                nodes.push({ id: targetName, name: targetName, severity: 'moderate', depCount: 0, vulCount: 0, isDirect: false, data: {} });
-                nodeMap[targetName] = nodes[nodes.length - 1];
+                // Only create a ghost node if this package has no own vuln entry
+                const ghost = { id: targetName, name: targetName, severity: 'info', depCount: 0, vulCount: 0, isDirect: false, data: {} };
+                nodes.push(ghost);
+                nodeMap[targetName] = ghost;
               }
-              links.push({ source: name, target: targetName });
+              links.push({ source: nodeMap[name], target: nodeMap[targetName] });
             });
-          }
-
-          for (const l of links) {
-            if (typeof l.source === 'string') l.source = nodeMap[l.source];
-            if (typeof l.target === 'string') l.target = nodeMap[l.target];
           }
 
           allNodes = nodes;
           allNodeMap = nodeMap;
+          // Use counts straight from meta.vulnerabilities in the payload
           renderMetadata(vulCounts, depCounts);
           renderGraph(nodes, links);
           setupZoom();
@@ -1646,7 +1810,7 @@ function getWebviewContent(webview: vscode.Webview): string {
             document.getElementById('back-to-severity').classList.remove('visible');
             document.querySelectorAll('#metadata-panel .item.severity-selected').forEach(el => el.classList.remove('severity-selected'));
             d3.selectAll('.link').classed('selected', false).classed('blast-radius', false);
-            if (nodeGrpRef) nodeGrpRef.selectAll('g').select('circle').attr('stroke', 'none').attr('stroke-width', 0);
+            if (nodeGrpRef) nodeGrpRef.selectAll('g').select('.node-bg').attr('stroke', 'none').attr('stroke-width', 0);
             if (blastZoneGrpRef) blastZoneGrpRef.selectAll('path').remove();
           };
           document.getElementById('back-to-severity').onclick = () => {
@@ -1717,7 +1881,7 @@ function getWebviewContent(webview: vscode.Webview): string {
           const selItem = document.querySelector('#metadata-panel .item[data-severity="' + severity + '"]');
           if (selItem) selItem.classList.add('severity-selected');
           d3.selectAll('.link').classed('selected', false).classed('blast-radius', false);
-          if (nodeGrpRef) nodeGrpRef.selectAll('g').select('circle').attr('stroke', 'none').attr('stroke-width', 0);
+          if (nodeGrpRef) nodeGrpRef.selectAll('g').select('.node-bg').attr('stroke', 'none').attr('stroke-width', 0);
           if (blastZoneGrpRef) blastZoneGrpRef.selectAll('path').remove();
           if (zoomRef && svgRef && packages.length > 0) {
             const topPkg = packages[0];
@@ -1826,13 +1990,31 @@ function getWebviewContent(webview: vscode.Webview): string {
           node.each(function(d) {
             const gEl = d3.select(this);
             const s = SEVERITY_STYLES[d.severity] || SEVERITY_STYLES.moderate;
-            gEl.append('circle').attr('r', nodeRadius)
+            const iconColor = (s.text === '#000000') ? '#000000' : '#F7F7F7';
+            gEl.append('circle').attr('class', 'node-bg')
+              .attr('r', nodeRadius)
               .attr('fill', s.bg)
               .attr('stroke', 'none')
               .attr('stroke-width', 5);
+            gEl.append('foreignObject')
+              .attr('x', -12).attr('y', -12)
+              .attr('width', 24).attr('height', 24)
+              .append('xhtml:div')
+              .attr('xmlns', 'http://www.w3.org/1999/xhtml')
+              .style('display', 'flex')
+              .style('align-items', 'center')
+              .style('justify-content', 'center')
+              .style('width', '100%')
+              .style('height', '100%')
+              .style('background', 'transparent')
+              .html(function() {
+                const iconClass = 'bi ' + (s.icon || 'bi-info-circle');
+                return '<i class="' + iconClass + '" style="font-size:18px;color:' + iconColor + ';background:transparent;" aria-hidden="true"></i>';
+              });
             gEl.append('text').attr('class', 'node-label')
               .attr('y', -nodeRadius - 6)
               .attr('dy', '0.35em')
+              .attr('text-anchor', 'middle')
               .text(d.name)
               .style('font-size', '14px')
               .style('fill', '#F7F7F7')
@@ -1858,9 +2040,9 @@ function getWebviewContent(webview: vscode.Webview): string {
             d3.selectAll('.link').classed('selected', l => (l.source && l.source.id === d.id) || (l.target && l.target.id === d.id))
               .classed('blast-radius', l => l.source && l.source.id === d.id && blastIds.has(l.target.id));
             nodeGrpRef.selectAll('g').each(function(n) {
-              const circle = d3.select(this).select('circle');
+              const shape = d3.select(this).select('.node-bg');
               const sel = n.id === d.id && n.isDirect;
-              circle.attr('stroke', sel ? '#0678CF' : 'none').attr('stroke-width', sel ? 5 : 0);
+              shape.attr('stroke', sel ? '#0678CF' : 'none').attr('stroke-width', sel ? 5 : 0);
             });
             blastZoneGrp.selectAll('path').remove();
             if (blastIds.size > 1) {

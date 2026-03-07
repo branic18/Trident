@@ -117,6 +117,9 @@ class GooseCache {
         }
         this.evictIfNeeded();
     }
+    clearAll() {
+        this.entries.clear();
+    }
     pruneByKeys(validKeys) {
         for (const key of this.entries.keys()) {
             if (!validKeys.has(key)) {

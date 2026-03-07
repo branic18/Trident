@@ -121,6 +121,7 @@ export function getMinimalEnvironment(): NodeJS.ProcessEnv {
     // Provider auth/config (required for Goose to run in extension host)
     'OPENAI_API_KEY', 'OPENAI_ORG_ID',
     'ANTHROPIC_API_KEY',
+    'OPENROUTER_API_KEY',
     'GOOSE_PROVIDER', 'GOOSE_MODEL'
   ];
   
@@ -513,14 +514,16 @@ export async function secureGooseExecution(
   workingDir: string,
   recipePath: string,
   signal?: AbortSignal,
-  timeoutMs: number = 30000
+  timeoutMs: number = 30000,
+  envOverrides?: NodeJS.ProcessEnv
 ): Promise<string> {
   try {
     // Sanitize working directory
     const safeWorkingDir = sanitizeWorkingDirectory(workingDir);
     
-    // Get minimal environment
-    const env = getMinimalEnvironment();
+    // Get minimal environment, merged with overrides (API key, provider, model)
+    const baseEnv = getMinimalEnvironment();
+    const env = envOverrides ? { ...baseEnv, ...envOverrides } : baseEnv;
 
     // Serialize params for Goose CLI
     const vulnContextJson = JSON.stringify(vulnContext);

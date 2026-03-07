@@ -1,0 +1,858 @@
+version: 1
+name: trident_blockchain_receipts
+description: >
+  Comprehensive modular implementation of blockchain receipt system for Trident vulnerability scanner.
+  Creates secure, verifiable scan receipts with optional blockchain anchoring using Polygon Amoy testnet.
+
+parameters:
+  - name: implementation_phase
+    description: "Which phase to implement: foundation|blockchain|frontend|testing|all"
+    required: true
+  - name: blockchain_network
+    description: "Target blockchain network for anchoring"
+    default: "polygon-amoy"
+  - name: project_root
+    description: "Root directory of the project"
+    default: "/Users/digitalflower/Desktop/Hackathon"
+
+tasks:
+  - id: phase1_foundation_backend
+    type: ai
+    condition: "{{implementation_phase}} == 'foundation' || {{implementation_phase}} == 'all'"
+    instructions: |
+      🏗️ **PHASE 1: Foundation Backend Setup**
+      
+      You are implementing the backend infrastructure for Trident's blockchain receipt system.
+      Create a complete Express.js API server that handles scan receipts.
+      
+      **CONTEXT:**
+      - Project: VS Code vulnerability scanner extension (Trident)
+      - Goal: Generate cryptographic receipts for security scans 
+      - Stack: Node.js/Express + TypeScript + Supabase + Vercel
+      - Auth: MVP API key system (sk_org_[id]_[hash])
+      
+      **IMPLEMENTATION TASKS:**
+      
+      1. **Project Structure Setup:**
+         ```
+         /api/
+           /receipts/
+             index.ts          # POST /api/receipts - create receipt
+             [id].ts          # GET /api/receipts/[id] - get receipt
+             verify.ts        # POST /api/receipts/verify - verify receipt
+           /health/
+             index.ts         # GET /api/health - health check
+         /lib/
+           supabase.ts        # Supabase client setup
+           auth.ts           # API key validation
+           receipt.ts        # Receipt generation & hashing
+           types.ts          # TypeScript interfaces
+           validation.ts     # Input validation with Joi
+         /utils/
+           crypto.ts         # Hashing utilities
+           errors.ts         # Error handling
+         vercel.json          # Vercel deployment config
+         package.json         # Dependencies
+         tsconfig.json        # TypeScript config
+         .env.example         # Environment template
+         ```
+      
+      2. **Core Type Definitions (lib/types.ts):**
+         ```typescript
+         export interface ScanReceipt {
+           id: string;              // UUID
+           orgId: string;
+           projectId: string;
+           repo: string;
+           commit: string;
+           environment: 'production' | 'staging' | 'development';
+           timestamp: string;       // ISO 8601
+           tool: string;           // 'securemap-npm-audit'
+           totalDependencies: number;
+           vulnerableDependencies: number;
+           totalVulnerabilities: number;
+           critical: number;
+           high: number;
+           medium: number;
+           low: number;
+           status: 'pass' | 'fail';
+           receiptHash: string;    // SHA-256 hex
+           scanHash?: string;      // Optional full scan hash
+           scanLocation?: string;  // Optional SBOM location
+           anchoringRequested: boolean;
+           anchored: boolean;
+           chainTxId: string | null;
+           chainNetwork: string | null;
+           createdAt: string;
+           createdByUserId: string;
+         }
+         
+         export interface CreateReceiptRequest {
+           repo: string;
+           commit: string;
+           environment: 'production' | 'staging' | 'development';
+           scanSummary: {
+             totalDependencies: number;
+             vulnerableDependencies: number;
+             totalVulnerabilities: number;
+             critical: number;
+             high: number;
+             medium: number;
+             low: number;
+             status: 'pass' | 'fail';
+           };
+           anchoringRequested?: boolean;
+           gooseSummary?: string;
+         }
+         ```
+      
+      3. **Supabase Integration (lib/supabase.ts):**
+         - Initialize Supabase client with service role key
+         - Create helper functions for CRUD operations
+         - Handle connection errors gracefully
+         - Implement retry logic for database operations
+      
+      4. **Receipt Generation & Hashing (lib/receipt.ts):**
+         ```typescript
+         // Canonical receipt hashing - order matters!
+         function generateReceiptHash(data: {
+           repo: string;
+           commit: string;
+           environment: string;
+           timestamp: string;
+           summary: ScanSummary;
+           gooseSummary?: string;
+         }): string {
+           // Create deterministic JSON (sorted keys)
+           // Compute SHA-256 hash
+           // Return hex string
+         }
+         ```
+      
+      5. **API Key Authentication (lib/auth.ts):**
+         - Validate API key format: sk_org_[id]_[hash]
+         - Map API key to orgId/projectId for MVP
+         - Implement middleware for request authentication
+         - Add rate limiting protection
+      
+      6. **API Endpoints:**
+         
+         **POST /api/receipts** - Create Receipt:
+         - Validate API key and extract orgId
+         - Validate input data with Joi schema
+         - Generate UUID and timestamp
+         - Compute receipt hash
+         - Store in Supabase scan_receipts table
+         - Return receipt data with generated fields
+         
+         **GET /api/receipts/[id]** - Get Receipt:
+         - Validate API key and orgId access
+         - Fetch receipt from database
+         - Return receipt data or 404
+         
+         **POST /api/receipts/verify** - Verify Receipt:
+         - Accept receipt data for verification
+         - Recompute hash and compare
+         - Check blockchain if anchored
+         - Return verification status
+      
+      7. **Environment Configuration:**
+         - Set up .env.example with all required variables
+         - Configure Vercel deployment settings
+         - Add proper CORS for VS Code extension
+         - Set up error logging and monitoring
+      
+      8. **Error Handling & Validation:**
+         - Comprehensive input validation
+         - Proper HTTP status codes
+         - Structured error responses
+         - Request logging for debugging
+      
+      9. **Testing Setup:**
+         - Unit tests for receipt generation
+         - Integration tests for API endpoints
+         - Mock Supabase for testing
+         - Test API key validation
+      
+      **DELIVERABLES:**
+      - Complete backend API server ready for Vercel deployment
+      - All environment variables configured
+      - Comprehensive error handling
+      - Input validation and security measures
+      - Ready for Phase 2 blockchain integration
+      
+      **SUCCESS CRITERIA:**
+      - POST /api/receipts creates valid receipts
+      - Receipt hashing is deterministic and secure
+      - API key authentication works correctly
+      - All endpoints return proper HTTP responses
+      - Ready to deploy to Vercel
+
+  - id: phase2_blockchain_integration
+    type: ai
+    condition: "{{implementation_phase}} == 'blockchain' || {{implementation_phase}} == 'all'"
+    instructions: |
+      ⛓️ **PHASE 2: Blockchain Integration & Anchoring**
+      
+      You are implementing blockchain anchoring for the Trident receipt system.
+      Add Polygon Amoy integration to anchor receipt hashes on-chain.
+      
+      **CONTEXT:**
+      - Phase 1 backend API is complete and working
+      - Need to add optional blockchain anchoring
+      - Use service wallet (no user wallets required)
+      - Background job system for async anchoring
+      
+      **IMPLEMENTATION TASKS:**
+      
+      1. **Blockchain Infrastructure (lib/blockchain.ts):**
+         ```typescript
+         import { ethers } from 'ethers';
+         
+         export class BlockchainService {
+           private provider: ethers.Provider;
+           private wallet: ethers.Wallet;
+           
+           constructor() {
+             // Initialize Polygon Amoy provider
+             // Load service wallet from private key
+             // Validate wallet balance
+           }
+           
+           async anchorHash(receiptHash: string, receiptId: string): Promise<string> {
+             // Create transaction with receipt hash in data field
+             // Submit transaction and wait for confirmation
+             // Return transaction hash
+           }
+           
+           async verifyAnchor(txId: string, expectedHash: string): Promise<boolean> {
+             // Fetch transaction from blockchain
+             // Extract hash from transaction data
+             // Compare with expected hash
+           }
+           
+           async getBalance(): Promise<string> {
+             // Check service wallet balance
+             // Return formatted balance
+           }
+         }
+         ```
+      
+      2. **Anchoring Queue System (lib/anchoring.ts):**
+         - Create background job queue for pending anchors
+         - Implement retry logic for failed transactions
+         - Add transaction status tracking
+         - Handle gas price optimization
+         
+         ```typescript
+         export class AnchoringService {
+           async queueForAnchoring(receiptId: string): Promise<void> {
+             // Add receipt to anchoring queue
+             // Update status to 'pending'
+           }
+           
+           async processAnchoringQueue(): Promise<void> {
+             // Process pending receipts
+             // Submit blockchain transactions
+             // Update receipt status
+           }
+         }
+         ```
+      
+      3. **Enhanced Receipt API:**
+         - Update POST /api/receipts to handle anchoringRequested
+         - Add background job triggering
+         - Update receipt status tracking
+         - Add anchoring status endpoints
+      
+      4. **New API Endpoints:**
+         
+         **GET /api/receipts/[id]/status** - Anchoring Status:
+         - Return current anchoring status
+         - Include transaction details if anchored
+         - Show pending/processing/completed states
+         
+         **POST /api/anchoring/process** - Manual Processing:
+         - Trigger anchoring queue processing
+         - For testing and manual intervention
+         - Admin/service endpoint
+         
+         **GET /api/blockchain/status** - Blockchain Health:
+         - Service wallet balance
+         - Network connection status
+         - Recent transaction statistics
+      
+      5. **Cron Job for Anchoring (api/cron/anchoring.ts):**
+         - Vercel cron function to process queue
+         - Run every 5 minutes
+         - Handle multiple receipts per batch
+         - Update database with results
+      
+      6. **Transaction Verification:**
+         - Implement chain verification logic
+         - Handle different transaction formats
+         - Add block confirmation requirements
+         - Cache verification results
+      
+      7. **Error Handling & Monitoring:**
+         - Blockchain connection failures
+         - Insufficient gas/funds errors
+         - Transaction timeout handling
+         - Failed transaction retry logic
+      
+      8. **Environment Updates:**
+         - Add blockchain configuration variables
+         - Service wallet private key (secure!)
+         - RPC URL and network settings
+         - Gas price configuration
+      
+      9. **Testing:**
+         - Mock blockchain interactions for tests
+         - Test transaction creation and verification
+         - Test queue processing logic
+         - Integration tests with testnet
+      
+      **DELIVERABLES:**
+      - Complete blockchain anchoring system
+      - Background job processing for async anchoring
+      - Transaction verification and status tracking
+      - Enhanced API with anchoring endpoints
+      - Comprehensive error handling for blockchain operations
+      
+      **SUCCESS CRITERIA:**
+      - Receipts with anchoringRequested=true get anchored
+      - Blockchain transactions include correct receipt hashes
+      - Verification can confirm on-chain anchors
+      - Background processing works reliably
+      - Service wallet management is secure
+
+  - id: phase3_frontend_integration
+    type: ai
+    condition: "{{implementation_phase}} == 'frontend' || {{implementation_phase}} == 'all'"
+    instructions: |
+      🎨 **PHASE 3: VS Code Extension Frontend Integration**
+      
+      You are integrating the receipt system into the existing Trident VS Code extension.
+      Add UI components for generating receipts and viewing anchoring status.
+      
+      **CONTEXT:**
+      - Existing VS Code extension with vulnerability scanner
+      - Backend API (Phase 1) and blockchain (Phase 2) are complete
+      - Need to add receipt generation UI to extension
+      - Must integrate with existing scan workflow
+      
+      **IMPLEMENTATION TASKS:**
+      
+      1. **Extension Updates (src/extension.ts):**
+         - Add new command: 'vulnerability-scanner.generateReceipt'
+         - Integrate with existing scan results
+         - Add API client for backend communication
+         - Handle authentication with API keys
+      
+      2. **Receipt Generation Integration:**
+         ```typescript
+         // Add to existing extension.ts
+         async function generateScanReceipt(scanResults: AuditResult, anchorOnChain: boolean = false) {
+           // Extract scan summary from npm audit results
+           // Get git commit hash from workspace
+           // Call backend API to create receipt
+           // Show receipt status in UI
+         }
+         
+         // Command registration
+         const generateReceiptCommand = vscode.commands.registerCommand(
+           'vulnerability-scanner.generateReceipt',
+           async () => {
+             // Show options modal (environment, anchoring)
+             // Run scan if needed
+             // Generate receipt
+             // Display result
+           }
+         );
+         ```
+      
+      3. **UI Components for Receipt Options:**
+         - Add "Production Scan Receipt" button to existing UI
+         - Create options modal/panel with:
+           - Environment selector (prod/staging/dev)
+           - "Anchor on blockchain" toggle
+           - Tooltip explaining blockchain anchoring
+         - Status display after receipt generation
+      
+      4. **Webview Updates (getWebviewContent):**
+         ```html
+         <!-- Add to existing webview HTML -->
+         <div class="receipt-section">
+           <button id="generate-receipt-btn" class="receipt-btn">
+             📋 Generate Scan Receipt
+           </button>
+           <div id="receipt-options" class="receipt-options hidden">
+             <label>
+               <input type="checkbox" id="anchor-toggle"> 
+               Anchor on blockchain (recommended)
+               <span class="tooltip">🛈</span>
+             </label>
+             <button id="confirm-receipt">Create Receipt</button>
+           </div>
+           <div id="receipt-status" class="receipt-status hidden">
+             <!-- Receipt status display -->
+           </div>
+         </div>
+         ```
+      
+      5. **Backend API Client (src/api/receiptClient.ts):**
+         ```typescript
+         export class ReceiptAPIClient {
+           private baseUrl: string;
+           private apiKey: string;
+           
+           constructor(baseUrl: string, apiKey: string) {
+             this.baseUrl = baseUrl;
+             this.apiKey = apiKey;
+           }
+           
+           async createReceipt(data: CreateReceiptRequest): Promise<ScanReceipt> {
+             // POST to /api/receipts
+             // Include Authorization header
+             // Handle errors and retries
+           }
+           
+           async getReceiptStatus(id: string): Promise<ScanReceipt> {
+             // GET from /api/receipts/{id}
+             // Return current status
+           }
+           
+           async verifyReceipt(receipt: ScanReceipt): Promise<VerificationResult> {
+             // POST to /api/receipts/verify
+             // Return verification status
+           }
+         }
+         ```
+      
+      6. **Configuration Management:**
+         - Add receipt API settings to VS Code settings
+         - API endpoint configuration
+         - API key storage (secure)
+         - Default anchoring preferences
+      
+      7. **Receipt Status Display:**
+         ```typescript
+         interface ReceiptStatusUI {
+           showReceiptCreated(receipt: ScanReceipt): void;
+           showAnchoringProgress(receiptId: string): void;
+           showAnchoringComplete(txId: string): void;
+           showError(error: string): void;
+         }
+         ```
+      
+      8. **Integration with Existing Scan Flow:**
+         - Add receipt generation to post-scan actions
+         - Integrate with existing vulnerability tree view
+         - Add receipt history/status to side panel
+         - Link receipts to scan results
+      
+      9. **Error Handling & User Feedback:**
+         - Handle API connection errors
+         - Show progress indicators
+         - Provide clear error messages
+         - Fallback to offline-only mode if API unavailable
+      
+      10. **Settings & Configuration UI:**
+          - VS Code settings for receipt system
+          - API endpoint configuration
+          - Default organization/project settings
+          - Anchoring preferences
+      
+      11. **Receipt Verification UI:**
+          - Add "Verify Receipt" command
+          - Show verification status
+          - Display blockchain confirmation details
+          - Copy receipt hash/transaction ID
+      
+      **DELIVERABLES:**
+      - Enhanced VS Code extension with receipt generation
+      - Seamless integration with existing scan workflow  
+      - User-friendly receipt options and status display
+      - Complete API integration with error handling
+      - Settings and configuration management
+      
+      **SUCCESS CRITERIA:**
+      - "Generate Receipt" button appears in scan results
+      - Options modal allows environment and anchoring selection
+      - Receipt generation works end-to-end
+      - Status updates show anchoring progress
+      - Users can verify receipts and view blockchain confirmations
+
+  - id: phase4_testing_production
+    type: ai
+    condition: "{{implementation_phase}} == 'testing' || {{implementation_phase}} == 'all'"
+    instructions: |
+      🧪 **PHASE 4: Testing, Security & Production Readiness**
+      
+      You are implementing comprehensive testing and production hardening for the blockchain receipt system.
+      Ensure security, reliability, and production readiness.
+      
+      **CONTEXT:**
+      - All previous phases (backend, blockchain, frontend) are complete
+      - Need comprehensive testing coverage
+      - Security hardening and production deployment
+      - Performance optimization and monitoring
+      
+      **IMPLEMENTATION TASKS:**
+      
+      1. **Comprehensive Test Suite:**
+         
+         **Backend API Tests (tests/api/):**
+         ```typescript
+         // tests/api/receipts.test.ts
+         describe('Receipt API', () => {
+           describe('POST /api/receipts', () => {
+             test('creates receipt with valid data');
+             test('validates API key authentication');
+             test('generates deterministic hashes');
+             test('handles Supabase errors gracefully');
+             test('queues anchoring when requested');
+           });
+           
+           describe('GET /api/receipts/[id]', () => {
+             test('returns receipt for valid ID');
+             test('enforces organization access control');
+             test('returns 404 for non-existent receipts');
+           });
+           
+           describe('POST /api/receipts/verify', () => {
+             test('verifies valid receipts');
+             test('detects tampered receipts');
+             test('verifies blockchain anchors');
+           });
+         });
+         ```
+         
+         **Blockchain Tests (tests/blockchain/):**
+         ```typescript
+         describe('Blockchain Service', () => {
+           test('anchors hashes to Polygon Amoy');
+           test('handles insufficient gas errors');
+           test('retries failed transactions');
+           test('verifies transaction confirmations');
+           test('detects network connection issues');
+         });
+         ```
+         
+         **Hash Generation Tests (tests/crypto/):**
+         ```typescript
+         describe('Receipt Hashing', () => {
+           test('generates deterministic hashes');
+           test('detects data tampering');
+           test('handles edge cases (empty fields, special chars)');
+           test('maintains hash consistency across versions');
+         });
+         ```
+      
+      2. **Security Hardening:**
+         
+         **Input Validation & Sanitization:**
+         - Comprehensive Joi schemas for all inputs
+         - SQL injection prevention
+         - XSS protection in receipt data
+         - File path traversal protection
+         
+         **API Security:**
+         ```typescript
+         // Enhanced security middleware
+         app.use(helmet({
+           contentSecurityPolicy: {
+             directives: {
+               defaultSrc: ["'self'"],
+               scriptSrc: ["'self'", "'unsafe-inline'"],
+             },
+           },
+           hsts: {
+             maxAge: 31536000,
+             includeSubDomains: true,
+             preload: true
+           }
+         }));
+         
+         // Rate limiting
+         app.use('/api', rateLimit({
+           windowMs: 15 * 60 * 1000, // 15 minutes
+           max: 100, // limit each IP to 100 requests per windowMs
+           message: 'Too many requests from this IP'
+         }));
+         ```
+         
+         **Environment Security:**
+         - Validate all environment variables on startup
+         - Secure private key storage and access
+         - Environment-specific configurations
+         - Secrets rotation planning
+      
+      3. **Performance Optimization:**
+         
+         **Database Performance:**
+         - Add database indexes for common queries
+         - Implement connection pooling
+         - Query optimization and monitoring
+         - Add database health checks
+         
+         **API Performance:**
+         ```typescript
+         // Response caching for verification
+         app.use('/api/receipts/verify', cache('5 minutes'));
+         
+         // Compression
+         app.use(compression());
+         
+         // Request timeout handling
+         app.use(timeout('30s'));
+         ```
+         
+         **Blockchain Performance:**
+         - Batch transaction processing
+         - Gas price optimization
+         - Connection pooling for RPC calls
+         - Retry strategies with exponential backoff
+      
+      4. **Error Monitoring & Logging:**
+         
+         **Structured Logging:**
+         ```typescript
+         import winston from 'winston';
+         
+         const logger = winston.createLogger({
+           level: 'info',
+           format: winston.format.combine(
+             winston.format.timestamp(),
+             winston.format.json()
+           ),
+           transports: [
+             new winston.transports.Console(),
+             new winston.transports.File({ filename: 'app.log' })
+           ]
+         });
+         
+         // Log all API requests
+         app.use(morgan('combined', { stream: { write: message => logger.info(message.trim()) } }));
+         ```
+         
+         **Error Tracking:**
+         - Implement error alerting for critical failures
+         - Track blockchain transaction failures
+         - Monitor API response times
+         - Database connection monitoring
+      
+      5. **Integration Testing:**
+         
+         **End-to-End Tests:**
+         ```typescript
+         describe('E2E Receipt Flow', () => {
+           test('complete receipt generation and verification');
+           test('blockchain anchoring end-to-end');
+           test('VS Code extension integration');
+           test('error recovery scenarios');
+         });
+         ```
+         
+         **Load Testing:**
+         - API endpoint load testing
+         - Concurrent receipt generation
+         - Blockchain service under load
+         - Database performance testing
+      
+      6. **Production Deployment:**
+         
+         **Vercel Configuration:**
+         ```json
+         {
+           "functions": {
+             "api/**/*.js": {
+               "runtime": "@vercel/node",
+               "memory": 1024,
+               "maxDuration": 30
+             }
+           },
+           "env": {
+             "NODE_ENV": "production"
+           },
+           "regions": ["iad1", "sfo1"]
+         }
+         ```
+         
+         **Environment Configuration:**
+         - Production environment variables
+         - Database connection strings
+         - Blockchain network configuration
+         - API rate limiting settings
+      
+      7. **Documentation:**
+         
+         **API Documentation:**
+         - OpenAPI/Swagger documentation
+         - Authentication examples
+         - Error code reference
+         - Rate limiting information
+         
+         **Deployment Guide:**
+         - Environment setup instructions
+         - Database migration scripts
+         - Blockchain wallet setup
+         - Monitoring configuration
+      
+      8. **Monitoring & Alerting:**
+         
+         **Health Checks:**
+         ```typescript
+         // GET /api/health
+         app.get('/api/health', async (req, res) => {
+           const health = {
+             status: 'ok',
+             timestamp: new Date().toISOString(),
+             services: {
+               database: await checkDatabase(),
+               blockchain: await checkBlockchain(),
+               api: 'ok'
+             }
+           };
+           res.json(health);
+         });
+         ```
+         
+         **Metrics Collection:**
+         - Receipt generation rates
+         - Anchoring success rates
+         - API response times
+         - Error frequencies
+      
+      9. **Security Audit:**
+         - Code security review
+         - Dependency vulnerability scanning
+         - API security testing
+         - Blockchain security validation
+      
+      **DELIVERABLES:**
+      - Comprehensive test suite with >90% coverage
+      - Production-ready security hardening
+      - Performance optimization and monitoring
+      - Complete documentation and deployment guides
+      - Error monitoring and alerting systems
+      
+      **SUCCESS CRITERIA:**
+      - All tests pass consistently
+      - Security scan shows no critical vulnerabilities  
+      - API performs well under load
+      - Production deployment is stable
+      - Monitoring provides visibility into system health
+
+  - id: verification_and_documentation
+    type: ai
+    condition: "{{implementation_phase}} == 'all'"
+    instructions: |
+      📋 **FINAL: System Verification & Documentation**
+      
+      You are completing the blockchain receipt system implementation.
+      Verify all components work together and create comprehensive documentation.
+      
+      **VERIFICATION TASKS:**
+      
+      1. **End-to-End System Test:**
+         - Run vulnerability scan in VS Code extension
+         - Generate production receipt with blockchain anchoring
+         - Verify receipt appears in Supabase database
+         - Confirm blockchain transaction on Polygon Amoy
+         - Verify receipt hash matches on-chain data
+         - Test receipt verification API
+      
+      2. **Component Integration Test:**
+         - VS Code extension → Backend API communication
+         - Backend API → Supabase database operations
+         - Backend API → Blockchain anchoring service
+         - Anchoring queue → Transaction processing
+         - Error handling across all components
+      
+      3. **Security Validation:**
+         - API key authentication working correctly
+         - Input validation preventing malicious data
+         - Rate limiting protecting against abuse
+         - Blockchain transactions are secure
+         - Database access controls enforced
+      
+      4. **Performance Verification:**
+         - Receipt generation completes within 5 seconds
+         - Blockchain anchoring processes in background
+         - API responds within acceptable timeouts
+         - Database queries are optimized
+         - System handles expected load
+      
+      **DOCUMENTATION CREATION:**
+      
+      1. **System Architecture Documentation:**
+         ```markdown
+         # Trident Blockchain Receipt System
+         
+         ## Architecture Overview
+         - VS Code Extension (Frontend)
+         - Express.js API (Backend)  
+         - Supabase Database (Storage)
+         - Polygon Amoy (Blockchain)
+         - Vercel (Deployment)
+         
+         ## Data Flow
+         1. User triggers receipt generation in VS Code
+         2. Extension calls backend API with scan results
+         3. Backend generates receipt and hash
+         4. Receipt stored in Supabase database
+         5. If requested, hash anchored on blockchain
+         6. Status updates provided to user
+         
+         ## Security Model
+         - API key authentication
+         - Organization-based access control
+         - Input validation and sanitization
+         - Secure hash generation
+         - Blockchain verification
+         ```
+      
+      2. **API Reference Documentation:**
+         - Complete endpoint documentation
+         - Authentication examples
+         - Request/response schemas
+         - Error codes and handling
+         - Rate limiting information
+      
+      3. **Deployment Guide:**
+         - Environment setup instructions
+         - Supabase configuration steps
+         - Blockchain wallet setup
+         - Vercel deployment process
+         - Environment variable configuration
+      
+      4. **User Guide:**
+         - How to generate receipts in VS Code
+         - Understanding receipt status
+         - Verifying receipts
+         - Blockchain anchoring benefits
+         - Troubleshooting common issues
+      
+      5. **Developer Guide:**
+         - Code structure explanation
+         - Adding new features
+         - Testing procedures
+         - Security considerations
+         - Performance optimization
+      
+      **SUCCESS CONFIRMATION:**
+      - [ ] All system components working together
+      - [ ] End-to-end receipt flow operational
+      - [ ] Blockchain anchoring confirmed working
+      - [ ] Security measures validated
+      - [ ] Performance meets requirements
+      - [ ] Documentation complete and accurate
+      - [ ] System ready for production use
+      
+      **FINAL DELIVERABLES:**
+      - Fully functional blockchain receipt system
+      - Complete system documentation
+      - Deployment and user guides
+      - Verified security and performance
+      - Production-ready configuration

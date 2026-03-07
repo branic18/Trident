@@ -2,11 +2,11 @@
   "name": "trident-vulnerability-package-scanner",
   "displayName": "Trident Vulnerability Package Scanner",
   "publisher": "TridentTeam",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "repository": {
-  "type": "git",
-  "url": "https://github.com/branic18/Trident.git"
-},
+    "type": "git",
+    "url": "https://github.com/branic18/Trident.git"
+  },
   "engines": {
     "vscode": "^1.109.0"
   },
@@ -87,7 +87,10 @@
         },
         "trident.goose.dataMode": {
           "type": "string",
-          "enum": ["full", "metadata"],
+          "enum": [
+            "full",
+            "metadata"
+          ],
           "default": "full",
           "description": "Data sent to Goose: full (includes snippets) or metadata-only."
         },

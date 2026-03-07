@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/branic18/Trident/compare/v1.3.0...v1.3.1) (2026-03-07)
+
+
+### Bug Fixes
+
+* Updated user experience- clear start path and resolved merge conflicts ([45adda1](https://github.com/branic18/Trident/commit/45adda109cc23591ec2eb70d956c4eebb16ff730))
+
 ## [1.3.0](https://github.com/branic18/Trident/compare/v1.2.0...v1.3.0) (2026-03-07)
 
 

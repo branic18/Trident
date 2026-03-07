@@ -4,3 +4,5 @@ local.env
 # Local context samples
 esbuild_vuln_context.json
 sample_vuln_context.json
+
+node_modules/

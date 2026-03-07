@@ -1,28 +1,40 @@
 {
-  "name": "vulnerability-scanner",
-  "version": "1.0.0",
+  "name": "trident-vulnerability-package-scanner",
+  "displayName": "Trident Vulnerability Package Scanner",
+  "publisher": "TridentTeam",
+  "version": "1.2.0",
   "engines": {
-    "vscode": "^1.50.0"
+    "vscode": "^1.109.0"
   },
   "description": "",
   "main": "./out/extension.js",
   "scripts": {
     "test": "npm run build && node tests/goose-ui-smoke.test.js && node tests/goose-ui-states.test.js && node tests/apply-code-fix.test.js && node tests/goose-cache.test.js && node tests/goose-sanitization.test.js && node tests/goose-concurrency.test.js && node tests/goose-webview-security.test.js",
     "build": "tsc -p ./",
-    "lint": "tsc -p ./ --noEmit",
-    "compile": "npm run build",
-    "watch": "tsc -p ./ --watch"
+    "watch": "tsc -p ./ --watch",
+    "compile": "tsc -p ./",
+    "lint": "eslint src --ext ts"
   },
-  "keywords": [],
+  "categories": [
+    "Other",
+    "Visualization"
+  ],
+  "keywords": [
+    "security",
+    "npm",
+    "dependency",
+    "vulnerability",
+    "audit"
+  ],
   "author": "",
   "license": "ISC",
-  "type": "commonjs",
+  "type": "module",
   "activationEvents": [
     "onCommand:vulnerability-scanner.scan",
     "onCommand:vulnerability-scanner.showLogs"
   ],
   "contributes": {
-     "views": {
+    "views": {
       "explorer": [
         {
           "id": "vulnerabilityView",
@@ -97,7 +109,12 @@
     "typescript": "^5.9.3"
   },
   "devDependencies": {
+    "@eslint/js": "^9.39.3",
     "@types/node": "^25.3.3",
-    "@types/vscode": "^1.109.0"
+    "@types/vscode": "^1.109.0",
+    "@typescript-eslint/eslint-plugin": "^8.56.1",
+    "@typescript-eslint/parser": "^8.56.1",
+    "eslint": "^9.39.3",
+    "typescript-eslint": "^8.56.1"
   }
 }

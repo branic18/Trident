@@ -40,6 +40,43 @@ Troubleshooting:
 - “Goose CLI not found” → install Goose and verify `goose --version`.
 - “Invalid JSON format from Goose” → confirm recipe path and provider credentials.
 
+## Creating a PR and publishing to VSCode Extension
+
+| Part      | Meaning          | When it changes                             |
+| --------- | ---------------- | ------------------------------------------- |
+| **MAJOR** | Breaking changes | Incompatible API/behavior changes           |
+| **MINOR** | New features     | Backwards-compatible feature additions      |
+| **PATCH** | Bug fixes        | Small fixes that don’t change functionality |
+
+Which commit message triggers each bump
+Release Please reads Conventional Commit prefixes.
+
+| Commit message                 | Version bump | Example         |
+| ------------------------------ | ------------ | --------------- |
+| `fix:`                         | PATCH        | `1.0.0 → 1.0.1` |
+| `feat:`                        | MINOR        | `1.0.0 → 1.1.0` |
+| `feat!:` or `BREAKING CHANGE:` | MAJOR        | `1.0.0 → 2.0.0` |
+| `docs:`                        | none         | changelog only  |
+| `chore:`                       | none         | ignored         |
+
+Example commit message (not the description): "fix: correct vulnerability panel rendering" ==> 1.0.0 → 1.0.1
+
+### Typical workflow 
+
+git commit -m "feat: add vulnerability visualization"
+git push
+↓
+Release Please updates the release PR
+↓
+Merge the release PR
+↓
+GitHub release created
+↓
+Your publish workflow runs
+↓
+Extension published to
+Visual Studio Code Marketplace
+
 
 Installation (1 Command)
 Requirements: [e.g., Node 18+, Python 3.9+, API keys].

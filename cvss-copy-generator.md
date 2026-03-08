@@ -10,11 +10,13 @@ This document provides:
 
 The goal is to communicate **real exploit risk** when vulnerabilities are present in packages and their dependency trees.
 
+**Package severity:** Packages are listed under their severity from the npm audit JSON payload (`vulnerabilities[name].severity`). A package with mixed advisories (e.g. 1 low and 1 moderate) is classified by the payload's `severity` field—e.g. `"severity": "moderate"` means the package appears under Moderate, not Low.
+
 Base copy concept:
 
-> Resolving `{vuln_count}` vulnerable packages protects `{dep_count}` dependent packages.
+> Resolving these vulnerable packages protects `{dep_count}` dependent packages.
 
-This generator expands that copy using **CVSS exploitability signals**.
+This generator expands that copy using **CVSS exploitability signals**. The phrase uses "these" (not a vuln count) so the copy reads naturally in the severity inspector context.
 
 ---
 
@@ -24,7 +26,6 @@ The generator requires:
 
 ```json
 {
-  "vuln_count": 3,
   "dep_count": 20,
   "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R"
 }
@@ -34,7 +35,6 @@ Parsed values:
 
 | Field               | Example |
 | ------------------- | ------- |
-| vulnerable packages | 3       |
 | dependent packages  | 20      |
 | attack vector       | N       |
 | attack complexity   | H       |
@@ -45,26 +45,26 @@ Parsed values:
 
 # 2. Base Copy Templates
 
-## Plural
+## Standard (no CVSS)
 
 ```
-Resolving {vuln_count} vulnerable packages protects {dep_count} dependent packages.
+Resolving these vulnerable packages protects {dep_count} dependent package(s).
 ```
 
-## Singular
+## With CVSS metrics
 
 ```
-Resolving 1 vulnerable package protects {dep_count} dependent packages.
+Resolving these vulnerable packages protects {dep_count} dependent package(s) from attacks that are {attack_vector}, {privileges}, {interaction}, and {complexity}.
 ```
 
 Alternative variants:
 
 ```
-Fixing {vuln_count} vulnerable packages secures {dep_count} downstream packages.
+Fixing these vulnerable packages secures {dep_count} downstream packages.
 
-Addressing {vuln_count} vulnerabilities protects {dep_count} dependent packages.
+Addressing these vulnerabilities protects {dep_count} dependent packages.
 
-Patching {vuln_count} vulnerable packages reduces risk across {dep_count} packages in your dependency tree.
+Patching these vulnerable packages reduces risk across {dep_count} packages in your dependency tree.
 ```
 
 ---
@@ -117,7 +117,7 @@ Each metric expands into a **human-readable risk phrase**.
 Recommended format:
 
 ```
-Resolving {vuln_count} vulnerable packages protects {dep_count} dependent packages from attacks that are:
+Resolving these vulnerable packages protects {dep_count} dependent packages from attacks that are:
 
 {attack_vector_phrase},
 {privileges_phrase},
@@ -132,7 +132,7 @@ and {complexity_phrase}.
 Pseudo-code example:
 
 ```pseudo
-function generateCopy(vulnCount, depCount, vector):
+function generateCopy(depCount, vector):
 
   metrics = parseVector(vector)
 
@@ -141,12 +141,11 @@ function generateCopy(vulnCount, depCount, vector):
   interaction = UI_MAP[metrics.UI]
   complexity = AC_MAP[metrics.AC]
 
-  baseCopy = pluralize(vulnCount,
-      "Resolving {vuln_count} vulnerable packages protects {dep_count} dependent packages",
-      "Resolving 1 vulnerable package protects {dep_count} dependent packages"
-  )
+  if (!metrics) {
+    return "Resolving these vulnerable packages protects " + depCount + " dependent package(s)."
+  }
 
-  return baseCopy +
+  return "Resolving these vulnerable packages protects " + depCount + " dependent package(s)" +
       " from attacks that are " +
       attackVector + ", " +
       privileges + ", " +
@@ -163,7 +162,6 @@ function generateCopy(vulnCount, depCount, vector):
 Input:
 
 ```
-vulnerable packages: 3
 dependent packages: 20
 
 vector:
@@ -176,7 +174,7 @@ UI:R
 Output:
 
 ```
-Resolving these 3 vulnerable packages protects 20 dependent packages from attacks that are exploitable over the network, requiring no privileges, requiring user interaction, and requiring specific conditions to exploit.
+Resolving these vulnerable packages protects 20 dependent packages from attacks that are exploitable over the network, requiring no privileges, requiring user interaction, and requiring specific conditions to exploit.
 ```
 
 ---
@@ -195,7 +193,7 @@ UI:N
 Output:
 
 ```
-Resolving these 3 vulnerable packages protects 20 dependent packages from attacks that are exploitable over the network, requiring no privileges, without user interaction, and relatively easy to exploit.
+Resolving these vulnerable packages protects 20 dependent packages from attacks that are exploitable over the network, requiring no privileges, without user interaction, and relatively easy to exploit.
 ```
 
 This represents **a highly dangerous vulnerability**.
@@ -216,7 +214,7 @@ UI:N
 Output:
 
 ```
-Resolving these 3 vulnerable packages protects 20 dependent packages from attacks that are exploitable by systems on the same network, requiring a low-privilege account, without user interaction, and relatively easy to exploit.
+Resolving these vulnerable packages protects 20 dependent packages from attacks that are exploitable by systems on the same network, requiring a low-privilege account, without user interaction, and relatively easy to exploit.
 ```
 
 ---
@@ -235,7 +233,7 @@ UI:R
 Output:
 
 ```
-Resolving these 3 vulnerable packages protects 20 dependent packages from attacks that are exploitable by a local system user, requiring a low-privilege account, requiring user interaction, and relatively easy to exploit.
+Resolving these vulnerable packages protects 20 dependent packages from attacks that are exploitable by a local system user, requiring a low-privilege account, requiring user interaction, and relatively easy to exploit.
 ```
 
 ---
@@ -245,13 +243,13 @@ Resolving these 3 vulnerable packages protects 20 dependent packages from attack
 For dashboards or badges:
 
 ```
-Fix {vuln_count} packages → protect {dep_count} dependencies
+Fix these packages → protect {dep_count} dependencies
 ```
 
 Or:
 
 ```
-{vuln_count} vulnerabilities impact {dep_count} packages
+These vulnerabilities impact {dep_count} packages
 ```
 
 ---

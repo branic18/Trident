@@ -1791,8 +1791,7 @@ function getWebviewContent(webview) {
           for (const [name, v] of Object.entries(vulns)) {
             const vv = v;
             const advisories = getAdvisories(vv.via);
-            const firstAdv = advisories[0];
-            const severity = (firstAdv && firstAdv.severity) ? firstAdv.severity.toLowerCase() : (vv.severity || 'moderate').toLowerCase();
+            const severity = (vv.severity || 'moderate').toLowerCase();
             const effects = vv.effects || [];
             const depCount = effects.length;
             const vulCount = advisories.length || 1;
@@ -1835,14 +1834,17 @@ function getWebviewContent(webview) {
             if (blastZoneGrpRef) blastZoneGrpRef.selectAll('path').remove();
           };
           document.getElementById('back-to-severity').onclick = () => {
-            if (lastSeverityInspector) showSeverityInspector(lastSeverityInspector);
+            if (lastSeverityInspector) {
+              const selItem = document.querySelector('#metadata-panel .item[data-severity="' + lastSeverityInspector + '"]');
+              const count = selItem ? parseInt(selItem.getAttribute('data-count') || '0', 10) : undefined;
+              showSeverityInspector(lastSeverityInspector, count);
+            }
           };
         }
 
-        function showSeverityInspector(severity) {
+        function showSeverityInspector(severity, metadataCount) {
           const packages = allNodes.filter(n => n.severity === severity);
           if (packages.length === 0) return;
-          const totalVuln = packages.reduce((s, p) => s + p.vulCount, 0);
           const totalDep = packages.reduce((s, p) => s + p.depCount, 0);
           let bestVector = null;
           let bestScore = -1;
@@ -1855,11 +1857,12 @@ function getWebviewContent(webview) {
               }
             });
           });
-          const cvssCopy = generateCVSSCopy(totalVuln, totalDep, bestVector);
+          const cvssCopy = generateCVSSCopy(totalDep, bestVector);
           const sevCap = severity.charAt(0).toUpperCase() + severity.slice(1);
-          const pkgWord = packages.length === 1 ? 'Package' : 'Packages';
+          const count = (typeof metadataCount === 'number' && metadataCount >= 0) ? metadataCount : packages.length;
+          const pkgWord = count === 1 ? 'Package' : 'Packages';
           let html = '<div class="dep-type">Vulnerabilities</div>';
-          html += '<div class="package-name">' + packages.length + ' ' + sevCap + ' Severity ' + pkgWord + '</div>';
+          html += '<div class="package-name">' + count + ' ' + sevCap + ' Severity ' + pkgWord + '</div>';
           html += '<div style="font-size:15px;color:#F7F7F7;margin-bottom:50px;line-height:1.5;">' + escapeHtml(cvssCopy) + '</div>';
           html += '<hr style="border:none;border-top:1px solid #555;margin:12px 0;" />';
           html += '<div class="severity-info-row"><i class="bi bi-info-circle"></i><span>Order is based on highest <a href="https://www.first.org/cvss/" target="_blank" class="severity-info-link">CVSS score</a> and total number of vulnerabilities.</span></div>';
@@ -1943,7 +1946,7 @@ function getWebviewContent(webview) {
             el.onclick = () => {
               const sev = el.getAttribute('data-severity');
               const count = parseInt(el.getAttribute('data-count') || '0', 10);
-              if (count > 0) showSeverityInspector(sev);
+              if (count > 0) showSeverityInspector(sev, count);
             };
           });
         }
@@ -2127,17 +2130,17 @@ function getWebviewContent(webview) {
           };
         }
 
-        function generateCVSSCopy(vulnCount, depCount, vectorStr) {
+        function generateCVSSCopy(depCount, vectorStr) {
           const parsed = vectorStr ? parseCVSS(vectorStr) : null;
           if (!parsed || !parsed.parts) {
-            return 'Resolving ' + vulnCount + ' vulnerable package' + (vulnCount === 1 ? '' : 's') + ' protects ' + depCount + ' dependent package' + (depCount === 1 ? '' : 's') + '.';
+            return 'Resolving these vulnerable packages protects ' + depCount + ' dependent package' + (depCount === 1 ? '' : 's') + '.';
           }
           const p = parsed.parts;
           const avPhrase = CVSS_AV_PHRASE[p.AV] || 'exploitable';
           const prPhrase = CVSS_PR_PHRASE[p.PR] || 'requiring privileges';
           const uiPhrase = CVSS_UI_PHRASE[p.UI] || 'with user interaction';
           const acPhrase = CVSS_AC_PHRASE[p.AC] || 'with varying complexity';
-          return 'Resolving ' + vulnCount + ' vulnerable package' + (vulnCount === 1 ? '' : 's') + ' protects ' + depCount + ' dependent package' + (depCount === 1 ? '' : 's') + ' from attacks that are ' + avPhrase + ', ' + prPhrase + ', ' + uiPhrase + ', and ' + acPhrase + '.';
+          return 'Resolving these vulnerable packages protects ' + depCount + ' dependent package' + (depCount === 1 ? '' : 's') + ' from attacks that are ' + avPhrase + ', ' + prPhrase + ', ' + uiPhrase + ', and ' + acPhrase + '.';
         }
 
         function renderInspector(d) {

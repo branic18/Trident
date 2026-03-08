@@ -221,7 +221,7 @@ Purpose
 Link to Documentation
 Decision Log
 Technical choices & tradeoffs.
-[Link to DECISION_LOG.md].
+[[Link to DECISION_LOG.md](https://docs.google.com/document/d/17cgNH-SKyaXy0CCviD1J5wXR3tXMuXZORyjeFMLUF9k/edit?usp=sharing)].
 Risk Log
 Issues identified & fixed.
 [Link to RISK_LOG.md].
@@ -254,7 +254,7 @@ All core flows are covered by Node-based tests (7 passing / 7 total).
 
 **Team Name:** TridentTeam
 
-- Brandi — Product Engineer  
+- Brandi — Product/AI Engineer  
   - [GitHub](https://github.com/branic18) · [LinkedIn](https://www.linkedin.com/in/brandi-nichols-dev/)
 
 - Brie — Product/AI Engineer  

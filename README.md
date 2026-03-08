@@ -30,15 +30,15 @@ Trident is a Node.js vulnerability package scanner that helps you automatically 
 
 ## Screenshots
 
-![Walking the user through how to get started using the Trident Vulnerability Package Scanner VSCode extension](vscode-extension-overview/Trident-Intro.mov)
+![Walking the user through how to get started using the Trident Vulnerability Package Scanner VSCode extension](extension-overview/Trident-Intro.mov)
 
-![Walking the user through how to interact with the canvas and receive relevant information](vscode-extension-overview/Short-Walkthrough.mov)
+![Walking the user through how to interact with the canvas and receive relevant information](extension-overview/Short-Walkthrough.mov)
 
-![Severity package inspector panel showing 4 out of 16 package vulnerabilities within the high severity group](vscode-extension-overview/Severity-Inspector-Panel.png)
-![Node package inspector panel showing 2 vulnerabilities within a moderate severity Node.js package](vscode-extension-overview/Node-details-1.png)
-![Node package inspector panel showing 1 vulnerability within a high severity Node.js package](vscode-extension-overview/Node-details-2.png)
+![Severity package inspector panel showing 4 out of 16 package vulnerabilities within the high severity group](extension-overview/Severity-Inspector-Panel.png)
+![Node package inspector panel showing 2 vulnerabilities within a moderate severity Node.js package](extension-overview/Node-details-1.png)
+![Node package inspector panel showing 1 vulnerability within a high severity Node.js package](extension-overview/Node-details-2.png)
 
-![API key usage selection is displayed with pre-defined provider and model selection with text area for API key input](vscode-extension-overview/API-Key-Usage.png)
+![API key usage selection is displayed with pre-defined provider and model selection with text area for API key input](extension-overview/API-Key-Usage.png)
 
 ## Privacy
 

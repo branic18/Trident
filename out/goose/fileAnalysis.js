@@ -44,11 +44,18 @@ const security_1 = require("./security");
 const execAsync = (0, util_1.promisify)(child_process_1.exec);
 const readFileAsync = (0, util_1.promisify)(fs.readFile);
 const existsAsync = (0, util_1.promisify)(fs.exists);
+const fileUseCache = new Map();
+const snippetCache = new Map();
+const MAX_CACHE_ENTRIES = 200;
 /**
  * Analyzes project files to find actual usage of a vulnerable package
  * Returns file paths where the package is imported/required/used
  */
 async function findFilesUsingPackage(packageName, projectRoot) {
+    const cacheKey = `${projectRoot}::${packageName}`;
+    const cached = fileUseCache.get(cacheKey);
+    if (cached)
+        return cached;
     const usedInFiles = [];
     try {
         // Use ripgrep to find import/require statements efficiently
@@ -82,12 +89,20 @@ async function findFilesUsingPackage(packageName, projectRoot) {
         // Also check package.json and common config files directly
         await checkConfigFiles(packageName, projectRoot, usedInFiles);
         // Remove duplicates and return
-        return [...new Set(usedInFiles)].slice(0, 10); // Limit to 10 most relevant files
+        const result = [...new Set(usedInFiles)].slice(0, 10); // Limit to 10 most relevant files
+        fileUseCache.set(cacheKey, result);
+        if (fileUseCache.size > MAX_CACHE_ENTRIES)
+            fileUseCache.clear();
+        return result;
     }
     catch (error) {
         console.error(`Error finding files using package ${packageName}:`, error);
         // Fallback: check common locations
-        return await fallbackFileSearch(packageName, projectRoot);
+        const result = await fallbackFileSearch(packageName, projectRoot);
+        fileUseCache.set(cacheKey, result);
+        if (fileUseCache.size > MAX_CACHE_ENTRIES)
+            fileUseCache.clear();
+        return result;
     }
 }
 /**
@@ -159,13 +174,22 @@ async function fallbackFileSearch(packageName, projectRoot) {
  * Returns ~10-20 lines of context around import/usage
  */
 async function extractCodeSnippet(filePath, packageName, projectRoot) {
+    const cacheKey = `${projectRoot}::${packageName}::${filePath}`;
+    if (snippetCache.has(cacheKey))
+        return snippetCache.get(cacheKey);
     try {
         const fullPath = path.join(projectRoot, filePath);
         if (!(0, security_1.isPathWithinRoot)(fullPath, projectRoot)) {
             console.warn(`Skipping code snippet extraction outside project root: ${fullPath}`);
+            snippetCache.set(cacheKey, undefined);
+            if (snippetCache.size > MAX_CACHE_ENTRIES)
+                snippetCache.clear();
             return undefined;
         }
         if (!await existsAsync(fullPath)) {
+            snippetCache.set(cacheKey, undefined);
+            if (snippetCache.size > MAX_CACHE_ENTRIES)
+                snippetCache.clear();
             return undefined;
         }
         const content = await readFileAsync(fullPath, 'utf8');
@@ -192,13 +216,20 @@ async function extractCodeSnippet(filePath, packageName, projectRoot) {
             // No specific import found, return early lines if it's a config file
             if (filePath.includes('config') || filePath.includes('package.json')) {
                 const snippetLines = lines.slice(0, Math.min(15, lines.length));
-                return {
+                const result = {
                     filePath: filePath,
                     startLine: 1,
                     endLine: snippetLines.length,
                     before: sanitizeCodeSnippet(snippetLines.join('\n'))
                 };
+                snippetCache.set(cacheKey, result);
+                if (snippetCache.size > MAX_CACHE_ENTRIES)
+                    snippetCache.clear();
+                return result;
             }
+            snippetCache.set(cacheKey, undefined);
+            if (snippetCache.size > MAX_CACHE_ENTRIES)
+                snippetCache.clear();
             return undefined;
         }
         // Extract context around the target line
@@ -206,15 +237,22 @@ async function extractCodeSnippet(filePath, packageName, projectRoot) {
         const startLine = Math.max(0, targetLine - contextLines);
         const endLine = Math.min(lines.length - 1, targetLine + contextLines);
         const snippetLines = lines.slice(startLine, endLine + 1);
-        return {
+        const result = {
             filePath: filePath,
             startLine: startLine + 1, // 1-indexed for display
             endLine: endLine + 1,
             before: sanitizeCodeSnippet(snippetLines.join('\n'))
         };
+        snippetCache.set(cacheKey, result);
+        if (snippetCache.size > MAX_CACHE_ENTRIES)
+            snippetCache.clear();
+        return result;
     }
     catch (error) {
         console.error(`Error extracting code snippet from ${filePath}:`, error);
+        snippetCache.set(cacheKey, undefined);
+        if (snippetCache.size > MAX_CACHE_ENTRIES)
+            snippetCache.clear();
         return undefined;
     }
 }

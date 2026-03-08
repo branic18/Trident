@@ -1,5 +1,5 @@
-# 75HER Project: [Insert Project Name]
-One-line Value Proposition: [Target User] gets [Outcome] in [Time] under [Constraint]. Example: Educators get shareable AI-powered lesson recaps in 60 seconds with zero setup.
+# 75HER Project: Trident 
+One-line Value Proposition: Designed to be accessible to everyone, this extension brings enterprise-grade npm vulnerability insights to solo devs, students, and small teams without requiring a security budget or complex setup.
 
 ## 🎯 Problem Statement
 **Who**  

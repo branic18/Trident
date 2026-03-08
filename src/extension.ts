@@ -713,6 +713,12 @@ async function runSecureGooseWithRetry(
     throw lastError ?? new Error('Goose execution failed');
 }
 
+async function openSuggestedDiff(before: string, after: string, languageId: string | undefined, title: string) {
+    const beforeDoc = await vscode.workspace.openTextDocument({ content: before, language: languageId });
+    const afterDoc = await vscode.workspace.openTextDocument({ content: after, language: languageId });
+    await vscode.commands.executeCommand('vscode.diff', beforeDoc.uri, afterDoc.uri, title);
+}
+
 async function applyCodeFixFromWebview(codeFix: { filePath?: string; before?: string; after?: string } | null | undefined) {
     if (!codeFix || !codeFix.filePath || !codeFix.before || !codeFix.after) {
         vscode.window.showWarningMessage('Apply fix failed: missing code fix data.');
@@ -725,17 +731,20 @@ async function applyCodeFixFromWebview(codeFix: { filePath?: string; before?: st
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
     const projectRoot = workspaceFolder?.uri.fsPath;
     if (!projectRoot) {
-        vscode.window.showWarningMessage('Apply fix failed: no workspace open.');
+        await openSuggestedDiff(codeFix.before, codeFix.after, undefined, 'Suggested fix (no workspace)');
+        vscode.window.showWarningMessage('Apply fix failed: no workspace open. Showing suggested diff only.');
         return;
     }
 
     const resolvedPath = resolveWorkspacePath(codeFix.filePath, projectRoot);
     if (!resolvedPath) {
-        vscode.window.showWarningMessage('Apply fix failed: invalid file path.');
+        await openSuggestedDiff(codeFix.before, codeFix.after, undefined, 'Suggested fix (invalid file path)');
+        vscode.window.showWarningMessage('Apply fix failed: invalid file path. Showing suggested diff only.');
         return;
     }
     if (!fs.existsSync(resolvedPath)) {
-        vscode.window.showWarningMessage(`Apply fix failed: file not found: ${resolvedPath}`);
+        await openSuggestedDiff(codeFix.before, codeFix.after, undefined, `Suggested fix (missing file: ${path.basename(resolvedPath)})`);
+        vscode.window.showWarningMessage(`Apply fix failed: file not found: ${resolvedPath}. Showing suggested diff only.`);
         return;
     }
 
@@ -743,7 +752,8 @@ async function applyCodeFixFromWebview(codeFix: { filePath?: string; before?: st
     const fileText = doc.getText();
     const occurrences = countOccurrences(fileText, codeFix.before);
     if (occurrences === 0) {
-        vscode.window.showWarningMessage('Apply fix failed: expected code snippet not found in file.');
+        await openSuggestedDiff(codeFix.before, codeFix.after, doc.languageId, `Suggested fix (no exact match): ${path.basename(resolvedPath)}`);
+        vscode.window.showWarningMessage('Apply fix failed: expected code snippet not found in file. Showing suggested diff only.');
         return;
     }
 

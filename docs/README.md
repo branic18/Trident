@@ -221,7 +221,7 @@ Purpose
 Link to Documentation
 Decision Log
 Technical choices & tradeoffs.
-[[Link to DECISION_LOG.md](https://docs.google.com/document/d/17cgNH-SKyaXy0CCviD1J5wXR3tXMuXZORyjeFMLUF9k/edit?usp=sharing)].
+[Link to DECISION_LOG.md](https://docs.google.com/document/d/17cgNH-SKyaXy0CCviD1J5wXR3tXMuXZORyjeFMLUF9k/edit?usp=sharing).
 Risk Log
 Issues identified & fixed.
 [Link to RISK_LOG.md].

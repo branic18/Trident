@@ -186,13 +186,22 @@ Installation (1 Command)
 Requirements: [e.g., Node 18+, Python 3.9+, API keys].
 Bash
 # Clone and run
-git clone [your-repo-url] && cd [project-name] && [your-setup-command]
-
+```bash
+git clone https://github.com/branic18/Trident.git && cd Trident && npm install && npm run build
 Access: Open the Trident panel inside VS Code (no browser or localhost port required).
-60-Second Demo Path
-Step 1: Open any JavaScript/TypeScript project with a package.json in VS Code and run the “Vulnerability Package Scanner” command from the Command Palette. → Trident runs npm audit --json (creating a lockfile if needed) and opens a webview with a dependency graph.
-Step 2: Hover and click on a red or orange node in the graph. → The Inspector panel shows which package is vulnerable, its severity, CVSS details, and suggested npm install commands or upgrade paths.
-Step 3: If Goose is set up, click “Generate AI insight” on one of the vulnerabilities. → You get a plain-language explanation of the issue and optional code-fix suggestions you can preview and apply without leaving VS Code.
+
+⏱️ 60-Second Demo Path
+Step 1
+Open any JavaScript/TypeScript project with a package.json in VS Code and run the “Vulnerability Package Scanner” command from the Command Palette.
+→ Trident runs npm audit --json (creating a lockfile if needed) and opens a webview with a dependency graph.
+
+Step 2
+Hover and click on a red or orange node in the graph.
+→ The Inspector panel shows which package is vulnerable, its severity, CVSS details, and suggested npm install commands or upgrade paths.
+
+Step 3
+If Goose is set up, click “Generate AI insight” on one of the vulnerabilities.
+→ You get a plain‑language explanation of the issue and optional code‑fix suggestions you can preview and apply without leaving VS Code.
 📹 Demo Video: [Insert Link] | 🔗 Live Demo: [Insert Link].
 
 ## 🏗️ Technical Architecture
@@ -222,21 +231,34 @@ Sources, assets, & attributions.
 
 
 ## 🧪 Testing & Known Issues
-Test Results: 7 passing / 7 total].
-_Known Issue_: Workspace‑shared cache requires an open workspace folder
-Symptom: .trident/trident-cache.json doesn’t appear.
-Workaround: Open a folder (not a single file) in VS Code.
-Goose requires local CLI + provider configuration
-_Known Issue_: Symptom: AI analysis fails with “Goose CLI not found” or missing provider key.
-Workaround: Install Goose CLI and set _API_KEY and GOOSE_MODEL.
 
-Next Step: Persistent, team‑shared “org cache” + backend mode
-Add an optional server‑backed cache and Goose execution service so teams can share insights across machines without local setup, while still respecting privacy controls..
+**Test Results**  
+All core flows are covered by Node-based tests (7 passing / 7 total).
+
+### Known Issues
+
+- **Workspace‑shared cache requires an open workspace folder**  
+  - Symptom: `.trident/trident-cache.json` never appears.  
+  - Workaround: Open a folder (not a single file) in VS Code before running the scanner.
+
+- **Goose requires local CLI + provider configuration**  
+  - Symptom: AI analysis fails with “Goose CLI not found” or a missing provider/API key.  
+  - Workaround: Install Goose CLI and configure your provider (for example, set `OPENAI_API_KEY` and `GOOSE_MODEL`).
+
+### Next Step
+
+- **Planned:** Persistent, team‑shared “org cache” + backend mode to let teams share AI insights across machines via an optional server‑backed cache and Goose execution service, while still respecting privacy controls.
+
 
 ## 👥 Team & Acknowledgments
-Team Name: [Your Team Name].
-Brandi, Product Engineer, [GitHub](https://github.com/branic18), [LinkedIn](https://www.linkedin.com/in/brandi-nichols-dev/)
-Brie, Product/AI Engineer, [GitHub](https://github.com/digitalfl0wer)), [LinkedIn](https://www.linkedin.com/in/bsspann/))
+
+**Team Name:** TridentTeam
+
+- Brandi — Product Engineer  
+  - [GitHub](https://github.com/branic18) · [LinkedIn](https://www.linkedin.com/in/brandi-nichols-dev/)
+
+- Brie — Product/AI Engineer  
+  - [GitHub](https://github.com/digitalfl0wer) · [LinkedIn](https://www.linkedin.com/in/bsspann/)
 
 Special thanks to: CreateHER Fest, and goose/Block.
 

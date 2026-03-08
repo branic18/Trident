@@ -883,18 +883,13 @@ export async function onVulnSelected(vuln: VulnerabilitySelection) {
     let sanitizedVulnId: string;
     let sanitizedPkgName: string;
     let sanitizedVersion: string;
+    let fallbackId = 'unknown';
     try {
         sanitizedVulnId = sanitizeId(String(vuln.id || `${vuln.packageName || 'pkg'}:${vuln.version || 'unknown'}:${vuln.title || 'vuln'}`));
+        fallbackId = sanitizedVulnId;
         sanitizedPkgName = sanitizePackageName(vuln.packageName || '');
-        sanitizedVersion = sanitizeVersion(vuln.version || '');
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        let fallbackId = 'unknown';
-        try {
-            fallbackId = sanitizeId(String(vuln.id || `${vuln.packageName || 'pkg'}:${vuln.version || 'unknown'}:${vuln.title || 'vuln'}`));
-        } catch {
-            // best effort fallback
-        }
         sendToWebview({
             type: 'gooseInsightError',
             vulnId: fallbackId,
@@ -904,6 +899,13 @@ export async function onVulnSelected(vuln: VulnerabilitySelection) {
         gooseMetrics.errors += 1;
         logGooseMetrics(0);
         return;
+    }
+    try {
+        sanitizedVersion = sanitizeVersion(vuln.version || '');
+    } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        sanitizedVersion = 'unknown';
+        logGoose(`Invalid version format; defaulting to "unknown": ${message}`);
     }
 
     // Get project root for secure file analysis

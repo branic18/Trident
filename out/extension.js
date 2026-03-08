@@ -810,20 +810,14 @@ async function onVulnSelected(vuln) {
     let sanitizedVulnId;
     let sanitizedPkgName;
     let sanitizedVersion;
+    let fallbackId = 'unknown';
     try {
         sanitizedVulnId = (0, security_2.sanitizeId)(String(vuln.id || `${vuln.packageName || 'pkg'}:${vuln.version || 'unknown'}:${vuln.title || 'vuln'}`));
+        fallbackId = sanitizedVulnId;
         sanitizedPkgName = (0, security_2.sanitizePackageName)(vuln.packageName || '');
-        sanitizedVersion = (0, security_2.sanitizeVersion)(vuln.version || '');
     }
     catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        let fallbackId = 'unknown';
-        try {
-            fallbackId = (0, security_2.sanitizeId)(String(vuln.id || `${vuln.packageName || 'pkg'}:${vuln.version || 'unknown'}:${vuln.title || 'vuln'}`));
-        }
-        catch {
-            // best effort fallback
-        }
         sendToWebview({
             type: 'gooseInsightError',
             vulnId: fallbackId,
@@ -833,6 +827,14 @@ async function onVulnSelected(vuln) {
         gooseMetrics.errors += 1;
         logGooseMetrics(0);
         return;
+    }
+    try {
+        sanitizedVersion = (0, security_2.sanitizeVersion)(vuln.version || '');
+    }
+    catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        sanitizedVersion = 'unknown';
+        logGoose(`Invalid version format; defaulting to "unknown": ${message}`);
     }
     // Get project root for secure file analysis
     const workspaceFolder = vscode.workspace.workspaceFolders?.[0];

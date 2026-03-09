@@ -127,6 +127,9 @@ function activate(context) {
                 logGoose(`Feedback: vulnId=${msg.vulnId} helpful=${helpful} reason=${reason}`);
                 vscode.window.showInformationMessage('Thanks for the feedback.');
             }
+            if (msg.command === 'openApiKeySettings') {
+                openApiKeySettings(context);
+            }
         });
         await runNpmAudit(panel, projectRoot);
     });
@@ -143,10 +146,14 @@ function activate(context) {
         treeViewProvider.showLogs();
     });
     // Register command to open API Key settings
-    const apiKeyCommand = vscode.commands.registerCommand('trident.openApiKeySettings', () => {
+    const apiKeySettingsCommand = vscode.commands.registerCommand('trident.openApiKeySettings', () => {
         openApiKeySettings(context);
     });
-    context.subscriptions.push(scanCommand, openWebviewCommand, showLogsCommand, apiKeyCommand);
+    // Register command for Trident | Add AI Insights (opens same tab as API Key in view)
+    const addAiInsightsCommand = vscode.commands.registerCommand('trident.addAiInsights', () => {
+        openApiKeySettings(context);
+    });
+    context.subscriptions.push(scanCommand, openWebviewCommand, showLogsCommand, apiKeySettingsCommand, addAiInsightsCommand);
 }
 let lastAuditPayload = null;
 class VulnerabilityTreeViewProvider {
@@ -173,16 +180,13 @@ class VulnerabilityTreeViewProvider {
     getChildren(element) {
         if (element) {
             if (element.id === 'run-scanner') {
-                return Promise.resolve([
-                    new VulnerabilityItem("Logs", "vulnerability-scanner.showLogs", "logs"),
-                    new VulnerabilityItem("API Key", "trident.openApiKeySettings", "api-key")
-                ]);
+                return Promise.resolve([]);
             }
             return Promise.resolve([]);
         }
         else {
             const runScanner = new VulnerabilityItem("Run Scanner", "vulnerabilityView.openWebview", "run-scanner");
-            runScanner.collapsibleState = vscode.TreeItemCollapsibleState.Expanded;
+            runScanner.collapsibleState = vscode.TreeItemCollapsibleState.None;
             return Promise.resolve([runScanner]);
         }
     }
@@ -196,54 +200,128 @@ function escapeHtml(str) {
 }
 const TRIDENT_OPENROUTER_API_KEY = 'trident.openrouter.apiKey';
 async function openApiKeySettings(context) {
-    const panel = vscode.window.createWebviewPanel('tridentApiKeySettings', 'API Key', vscode.ViewColumn.One, { enableScripts: true });
+    const panel = vscode.window.createWebviewPanel('tridentApiKeySettings', 'Add AI Insights', vscode.ViewColumn.One, { enableScripts: true });
     const hasKey = !!(await context.secrets.get(TRIDENT_OPENROUTER_API_KEY));
-    panel.webview.html = getApiKeySettingsWebviewContent(hasKey);
+    await context.globalState.update('trident.hasApiKey', hasKey);
+    const hasConsent = context.globalState.get('gooseConsent') === 'enabled';
+    panel.webview.html = getApiKeySettingsWebviewContent(hasKey, hasConsent);
     panel.webview.onDidReceiveMessage(async (msg) => {
         if (msg.command === 'saveApiKey' && typeof msg.apiKey === 'string') {
             await context.secrets.store(TRIDENT_OPENROUTER_API_KEY, msg.apiKey.trim());
+            await context.globalState.update('trident.hasApiKey', true);
             vscode.window.showInformationMessage('API key saved securely.');
-            panel.webview.html = getApiKeySettingsWebviewContent(true);
+            const consent = context.globalState.get('gooseConsent') === 'enabled';
+            panel.webview.html = getApiKeySettingsWebviewContent(true, consent);
+        }
+        else if (msg.command === 'deleteApiKey') {
+            await context.secrets.delete(TRIDENT_OPENROUTER_API_KEY);
+            await context.globalState.update('trident.hasApiKey', false);
+            vscode.window.showInformationMessage('API key deleted.');
+            panel.webview.html = getApiKeySettingsWebviewContent(false, context.globalState.get('gooseConsent') === 'enabled');
+        }
+        else if (msg.command === 'enableAiInsights') {
+            await context.globalState.update('gooseConsent', 'enabled');
+            vscode.window.showInformationMessage('AI Insights enabled. Click a vulnerability to get AI analysis.');
+            panel.webview.html = getApiKeySettingsWebviewContent(hasKey, true);
+        }
+        else if (msg.command === 'installGooseCli') {
+            await runGooseCliInstall();
         }
     });
 }
-function getApiKeySettingsWebviewContent(hasKey) {
+async function runGooseCliInstall() {
+    const isWindows = process.platform === 'win32';
+    const terminal = vscode.window.createTerminal({ name: 'Trident: Install Goose CLI' });
+    terminal.show();
+    if (isWindows) {
+        terminal.sendText('irm https://raw.githubusercontent.com/block/goose/main/download_cli.ps1 | iex');
+        vscode.window.showInformationMessage('Goose CLI install started in terminal. After install, restart VS Code so PATH is updated.');
+    }
+    else {
+        terminal.sendText('curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | CONFIGURE=false bash');
+        vscode.window.showInformationMessage('Goose CLI install started in terminal. After install, restart VS Code (or open a new terminal) so PATH is updated.');
+    }
+}
+function getApiKeySettingsWebviewContent(hasKey, hasConsent) {
     const keyStatus = hasKey ? 'API key is configured.' : 'No API key configured.';
+    const consentStatus = hasConsent ? 'AI Insights enabled.' : 'AI Insights not yet enabled.';
     return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>API Key</title>
+  <title>Add AI Insights</title>
   <style>
-    body { font-family: 'IBM Plex Sans', -apple-system, sans-serif; background: #1e1e1e; color: #F7F7F7; padding: 24px; line-height: 1.6; max-width: 560px; }
+    body { font-family: 'IBM Plex Sans', -apple-system, sans-serif; background: #1e1e1e; color: #F7F7F7; padding: 24px; line-height: 1.6; max-width: 600px; }
     h2 { font-size: 18px; margin-bottom: 16px; color: #F7F7F7; }
-    p { font-size: 14px; color: #BBBBBB; margin-bottom: 16px; }
+    h3 { font-size: 15px; margin: 24px 0 8px 0; color: #F7F7F7; }
+    p { font-size: 14px; color: #BBBBBB; margin-bottom: 12px; }
     .provider { font-size: 14px; color: #BBBBBB; margin: 12px 0 4px 0; }
     .provider strong { color: #F7F7F7; }
     .label { font-size: 14px; color: #F7F7F7; margin: 20px 0 8px 0; display: block; }
     textarea { width: 100%; min-height: 80px; padding: 12px; background: #252526; border: 1px solid #555; border-radius: 4px; color: #F7F7F7; font-family: inherit; font-size: 13px; resize: vertical; box-sizing: border-box; }
     textarea:focus { outline: none; border-color: #0678CF; }
     textarea::placeholder { color: #666; }
-    button { background: #0678CF; color: #F7F7F7; border: none; padding: 10px 20px; border-radius: 4px; font-size: 14px; cursor: pointer; margin-top: 12px; }
+    button { background: #0678CF; color: #F7F7F7; border: none; padding: 10px 20px; border-radius: 4px; font-size: 14px; cursor: pointer; margin-top: 8px; margin-right: 8px; }
     button:hover { background: #0568b8; }
+    button.secondary { background: #555; }
+    button.secondary:hover { background: #666; }
     .status { font-size: 12px; color: #22c55e; margin-top: 8px; }
-    .note { font-size: 12px; color: #888; margin-top: 16px; font-style: italic; }
+    .note { font-size: 12px; color: #888; margin-top: 12px; font-style: italic; }
+    .section { margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #333; }
+    .section:last-of-type { border-bottom: none; }
+    code { background: #252526; padding: 2px 6px; border-radius: 4px; font-size: 12px; }
+    .steps { margin: 8px 0; padding-left: 20px; }
+    .steps li { margin: 6px 0; color: #BBBBBB; font-size: 13px; }
   </style>
 </head>
 <body>
-  <h2>API Key</h2>
-  <p>Configure your AI model providers by adding their API keys. Your keys are stored securely and encrypted locally.</p>
-  <p class="note">(For V1 the options are pre-selected for you)</p>
-  <div class="provider"><strong>Pre-selected provider:</strong> OpenRouter</div>
-  <div class="provider"><strong>Pre-selected model:</strong> OpenAI 5.1</div>
-  <label class="label" for="api-key">Enter API key</label>
-  <textarea id="api-key" placeholder="Paste your OpenRouter API key here" rows="3"></textarea>
-  <button id="save-btn">Save</button>
-  <div class="status" id="status">${escapeHtml(keyStatus)}</div>
+  <h2>Add AI Insights</h2>
+  <p>Enable AI-powered vulnerability analysis. Complete the steps below.</p>
+
+  <div class="section">
+    <h3>1. Enable AI Insights</h3>
+    <p>Allow Trident to run Goose AI for vulnerability explanations.</p>
+    ${hasConsent ? '<div class="status">' + escapeHtml(consentStatus) + '</div>' : '<button id="enable-btn">Enable AI Insights</button>'}
+  </div>
+
+  <div class="section">
+    <h3>2. Install Goose CLI</h3>
+    <p>Goose CLI is required. Click the button to install it in a terminal:</p>
+    <button id="install-btn">Install Goose CLI</button>
+    <p class="note">After install, restart VS Code (or open a new terminal) so <code>goose</code> is on your PATH. Verify with <code>goose --version</code>.</p>
+    <p><strong>Manual install:</strong></p>
+    <ul class="steps">
+      <li>macOS/Linux: <code>curl -fsSL https://github.com/block/goose/releases/download/stable/download_cli.sh | bash</code></li>
+      <li>macOS (Homebrew): <code>brew install --cask block-goose</code></li>
+      <li>Windows: Run in PowerShell: <code>irm https://github.com/block/goose/releases/download/stable/download_cli.ps1 | iex</code></li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h3>3. API Key</h3>
+    <p>Configure your AI provider. Keys are stored securely and encrypted locally.</p>
+    <div class="provider"><strong>Pre-selected provider:</strong> OpenRouter</div>
+    <div class="provider"><strong>Pre-selected model:</strong> OpenAI 5.1</div>
+    <p><strong>OpenRouter:</strong> Get your API key at <a href="https://openrouter.ai/keys" target="_blank" rel="noopener" style="color:#0678CF;">openrouter.ai/keys</a> — create an account, add credits, then copy your API key.</p>
+    <p class="note">As of now, AI Insights only works with the provider OpenRouter and the OpenAI 5.1 model. Options for other providers and models will be available in the future.</p>
+    ${hasKey ? `
+    <div class="status" style="margin-bottom:8px;">API key is configured.</div>
+    <div class="api-key-masked" style="font-family:monospace;font-size:13px;color:#BBBBBB;letter-spacing:2px;padding:8px 0;user-select:none;">${'*'.repeat(48)}</div>
+    <p><strong>If you delete your API key, you will not receive AI Insights within your vulnerability mapping.</strong></p>
+    <button id="delete-btn" class="secondary">Delete API Key</button>
+    ` : `
+    <label class="label" for="api-key">Enter API key</label>
+    <textarea id="api-key" placeholder="Paste your OpenRouter API key here" rows="3"></textarea>
+    <button id="save-btn">Save</button>
+    <div class="status" id="status">${escapeHtml(keyStatus)}</div>
+    `}
+  </div>
+
   <script>
     const vscode = acquireVsCodeApi();
-    document.getElementById('save-btn').addEventListener('click', () => {
+    const saveBtn = document.getElementById('save-btn');
+    if (saveBtn) saveBtn.addEventListener('click', () => {
       const key = document.getElementById('api-key').value.trim();
       if (key) {
         vscode.postMessage({ command: 'saveApiKey', apiKey: key });
@@ -251,6 +329,11 @@ function getApiKeySettingsWebviewContent(hasKey) {
         alert('Please enter an API key.');
       }
     });
+    const deleteBtn = document.getElementById('delete-btn');
+    if (deleteBtn) deleteBtn.addEventListener('click', () => vscode.postMessage({ command: 'deleteApiKey' }));
+    const enableBtn = document.getElementById('enable-btn');
+    if (enableBtn) enableBtn.addEventListener('click', () => vscode.postMessage({ command: 'enableAiInsights' }));
+    document.getElementById('install-btn').addEventListener('click', () => vscode.postMessage({ command: 'installGooseCli' }));
   </script>
 </body>
 </html>`;
@@ -354,7 +437,14 @@ async function runNpmAudit(panel, projectRoot) {
         const provider = globalThis.__vulnTreeProvider;
         if (provider)
             provider.setAuditPayload(auditResults);
-        panel.webview.postMessage({ command: 'loadData', data: auditResults });
+        let apiKeyInstalled = false;
+        try {
+            apiKeyInstalled = extensionContext ? !!(await extensionContext.secrets.get(TRIDENT_OPENROUTER_API_KEY)) : false;
+        }
+        catch {
+            // Don't block canvas load if secrets API fails
+        }
+        panel.webview.postMessage({ command: 'loadData', data: auditResults, apiKeyInstalled });
         pruneCacheByAuditResults(auditResults);
     }
     catch (error) {
@@ -374,7 +464,7 @@ function getGooseConfig() {
         enabled: cfg.get('enabled', true),
         recipePath: cfg.get('recipePath', './recipes/trident_vuln_explainer.yaml'),
         maxRetries: cfg.get('maxRetries', 1),
-        timeoutMs: cfg.get('timeoutMs', 30000),
+        timeoutMs: cfg.get('timeoutMs', 120000),
         maxConcurrency: cfg.get('maxConcurrency', 2),
         cacheMaxEntries: cfg.get('cacheMaxEntries', 200),
         cacheMaxAgeMs: cfg.get('cacheMaxAgeMs', 7 * 24 * 60 * 60 * 1000),
@@ -616,6 +706,11 @@ function parseGooseOutput(raw) {
             return JSON.parse(slice);
         }
     }
+    // Output is not JSON - may be a provider error message (e.g. out of credits)
+    const trimmed = cleaned.trim();
+    if (trimmed.length > 0 && trimmed.length < 1000) {
+        throw new Error(trimmed);
+    }
     throw new Error('Invalid JSON format from Goose');
 }
 function logGooseParseFailure(raw, err) {
@@ -640,8 +735,10 @@ async function runSecureGooseWithRetry(context, workingDir, recipePath, signal, 
     };
     if (provider === 'openrouter' && extensionContext) {
         const apiKey = await extensionContext.secrets.get(TRIDENT_OPENROUTER_API_KEY);
-        if (apiKey)
+        if (apiKey) {
             envOverrides.OPENROUTER_API_KEY = apiKey;
+            envOverrides.GOOSE_PROVIDER__API_KEY = apiKey;
+        }
     }
     let attempt = 0;
     let lastError = null;
@@ -784,22 +881,44 @@ async function onVulnSelected(vuln) {
         logGooseMetrics(0);
         return;
     }
+    const hasApiKey = extensionContext?.globalState.get('trident.hasApiKey') === true;
+    if (!hasApiKey) {
+        let vulnIdForMsg = 'unknown';
+        try {
+            vulnIdForMsg = (0, security_2.sanitizeId)(String(vuln.id || `${vuln.packageName || 'pkg'}:${vuln.version || 'unknown'}:${vuln.title || 'vuln'}`));
+        }
+        catch { /* use unknown */ }
+        sendToWebview({ type: 'gooseInsightError', vulnId: vulnIdForMsg, error: 'NO_API_KEY' });
+        logGoose('AI analysis skipped: no API key configured.');
+        logGooseMetrics(0);
+        return;
+    }
+    let vulnIdForStatus = 'unknown';
+    try {
+        vulnIdForStatus = (0, security_2.sanitizeId)(String(vuln.id || `${vuln.packageName || 'pkg'}:${vuln.version || 'unknown'}:${vuln.title || 'vuln'}`));
+    }
+    catch { /* use unknown */ }
+    const sendStatus = (status) => sendToWebview({ type: 'gooseInsight', vulnId: vulnIdForStatus, data: { pending: true, status } });
+    sendStatus('Checking Goose consent...');
+    logGoose('Checking Goose consent...');
     const consentOk = await ensureGooseConsent();
     if (!consentOk) {
         sendToWebview({
             type: 'gooseInsightError',
-            vulnId: (0, security_2.sanitizeId)(String(vuln.id || `${vuln.packageName || 'pkg'}:${vuln.version || 'unknown'}:${vuln.title || 'vuln'}`)),
+            vulnId: vulnIdForStatus,
             error: 'AI analysis disabled. Enable in settings or consent prompt.'
         });
         logGoose('AI analysis skipped: user declined consent.');
         logGooseMetrics(0);
         return;
     }
+    sendStatus('Checking Goose CLI availability...');
+    logGoose('Checking Goose CLI availability...');
     const gooseReady = await ensureGooseAvailable();
     if (!gooseReady) {
         sendToWebview({
             type: 'gooseInsightError',
-            vulnId: (0, security_2.sanitizeId)(String(vuln.id || `${vuln.packageName || 'pkg'}:${vuln.version || 'unknown'}:${vuln.title || 'vuln'}`)),
+            vulnId: vulnIdForStatus,
             error: 'Goose CLI not found. Install Goose and ensure it is on PATH.'
         });
         vscode.window.showWarningMessage('Goose CLI not found. Install Goose and ensure it is on PATH.');
@@ -875,9 +994,12 @@ async function onVulnSelected(vuln) {
             recordGooseEvent({ type: 'cache_hit', vulnId: sanitizedVulnId });
             return;
         }
+        sendStatus('Building enhanced vulnerability context...');
         // Notify webview that analysis is pending
-        sendToWebview({ type: 'gooseInsight', vulnId: sanitizedVulnId, data: { pending: true } });
+        sendToWebview({ type: 'gooseInsight', vulnId: sanitizedVulnId, data: { pending: true, status: 'Executing Goose...' } });
         // ===== PHASE 3: SECURE AI EXECUTION =====
+        const resolvedRecipe = resolveRecipePathForExtension(config.recipePath, projectRoot || process.cwd());
+        logGoose(`Executing Goose: recipe=${resolvedRecipe} timeout=${config.timeoutMs}ms`);
         console.log('🤖 Executing secure AI analysis with enterprise validation...');
         // SECURITY: Use secure Goose execution with comprehensive validation
         const abortController = new AbortController();
@@ -901,7 +1023,8 @@ async function onVulnSelected(vuln) {
             }
             catch (err) {
                 logGooseParseFailure(rawInsight, err);
-                throw new Error('Invalid JSON format from Goose');
+                const errMsg = err instanceof Error ? err.message : String(err);
+                throw new Error(errMsg);
             }
         }
         const obj = isRecord(parsedInsight) ? parsedInsight : null;
@@ -976,10 +1099,25 @@ async function onVulnSelected(vuln) {
         gooseMetrics.errors += 1;
         logGooseMetrics(0);
         recordGooseEvent({ type: 'error', vulnId: sanitizedVulnId, errorType: classified.type });
-        // Enhanced error reporting with security context
-        const secureErrorMessage = err instanceof Error
-            ? (err.message.includes('validation') ? 'AI output validation failed' : 'AI analysis temporarily unavailable')
-            : 'Unknown AI processing error';
+        // Enhanced error reporting - show user-friendly, action-oriented messages
+        let errMsg = err instanceof Error ? err.message : String(err);
+        errMsg = errMsg.replace(/^.*?Secure Goose execution failed:\s*/i, '').replace(/^Error:\s*/i, '').trim();
+        const lower = errMsg.toLowerCase();
+        const isValidation = lower.includes('validation');
+        const isCreditsOrAccount = /credits|account|provider|add more/i.test(errMsg);
+        let secureErrorMessage;
+        if (isValidation) {
+            secureErrorMessage = 'AI output validation failed';
+        }
+        else if (isCreditsOrAccount) {
+            secureErrorMessage = 'Please check your account with your provider to add more credits, then reopen this panel to generate your insights.';
+        }
+        else if (/api|key|auth|401|403|timeout|timed out|failed|error|not found|invalid/i.test(errMsg)) {
+            secureErrorMessage = errMsg;
+        }
+        else {
+            secureErrorMessage = 'AI analysis temporarily unavailable';
+        }
         sendToWebview({
             type: 'gooseInsightError',
             vulnId: sanitizedVulnId,
@@ -1119,6 +1257,10 @@ function getWebviewContent(webview) {
         #metadata-panel .item.severity-selected.severity-moderate { background: #F19E21 !important; border-radius: 0; }
         #metadata-panel .item.severity-selected.severity-low { background: #285AFF !important; border-radius: 0; }
         #metadata-panel .item.severity-selected.severity-info { background: #555555 !important; border-radius: 0; }
+        #metadata-panel .api-key-status {
+          display: flex; align-items: center; gap: 6px; margin-top: 12px;
+          font-family: 'IBM Plex Mono', monospace; font-size: 13px; font-weight: 400; color: #FFFFFE;
+        }
         #inspector-panel {
           position: absolute; top: 0; right: 0; width: 50%; height: 100%;
           background: #252526; display: none; overflow-y: auto;
@@ -1506,6 +1648,18 @@ function getWebviewContent(webview) {
         .copy-after-btn:hover {
           background: rgba(6, 120, 207, 0.35);
         }
+        .add-api-key-btn {
+          background: #2f2f2f;
+          color: #e0e0e0;
+          border: 1px solid #999;
+        }
+        .add-api-key-btn:hover,
+        .add-api-key-btn:focus,
+        .add-api-key-btn:active {
+          background: #1a1a1a;
+          color: #e0e0e0;
+          border: 1px solid #2f2f2f;
+        }
         
         /* Metadata Section */
         .metadata-section {
@@ -1524,19 +1678,23 @@ function getWebviewContent(webview) {
           margin-top: 10px;
         }
         
-        /* Error State */
+        /* Error State - gray box, white header/icon */
         .ai-error {
-          border-color: #FF6B6B;
-          background: rgba(255, 107, 107, 0.1);
+          border-color: #555;
+          background: rgba(85, 85, 85, 0.2);
         }
-        .ai-error .ai-header {
-          color: #FF6B6B;
+        .ai-error .ai-header,
+        .ai-error .ai-title {
+          color: #FFFFFE;
+        }
+        .ai-error .ai-title i {
+          color: #FFFFFE;
         }
         .ai-error .ai-content {
-          color: #FFAAAA;
+          color: #E0E0E0;
           font-size: 14px;
           padding: 12px;
-          background: rgba(0,0,0,0.3);
+          background: rgba(0,0,0,0.2);
           border-radius: 4px;
         }
         .ai-warning {
@@ -1679,7 +1837,10 @@ function getWebviewContent(webview) {
               var el = document.querySelector('#loading-state span');
               if (el) el.textContent = msg.status;
             }
-            if (msg.command === 'loadData') { window.__handleLoadData(msg.data); }
+            if (msg.command === 'loadData') {
+              window.__apiKeyInstalled = !!msg.apiKeyInstalled;
+              window.__handleLoadData(msg.data);
+            }
             if (msg.command === 'loadError') { window.__handleLoadError(msg.error); }
           });
           window.__vscodeApi.postMessage({ command: 'webviewReady' });
@@ -1979,6 +2140,9 @@ function getWebviewContent(webview) {
             '<div class="item">' + (depCounts.optional||0) + ' optional</div>' +
             '<div class="item">' + (depCounts.peer||0) + ' peer</div>' +
             '<div class="item">' + (depCounts.peerOptional||0) + ' peer optional</div></div>';
+          if (window.__apiKeyInstalled) {
+            html += '<div class="api-key-status"><i class="bi bi-check-circle-fill" style="color:#FFFFFE;font-size:14px;flex-shrink:0;" aria-hidden="true"></i><span>API Key installed</span></div>';
+          }
           document.getElementById('metadata-panel').innerHTML = html;
           document.getElementById('metadata-panel').style.pointerEvents = 'auto';
           document.querySelectorAll('#metadata-panel .item[data-severity]').forEach(el => {
@@ -2366,15 +2530,27 @@ function getWebviewContent(webview) {
           }
         }
 
+        function insertOrReplaceAiSection(html) {
+          const inspectorContent = document.getElementById('inspector-content');
+          if (!inspectorContent) return;
+          const existingAiSection = inspectorContent.querySelector('.ai-section');
+          if (existingAiSection) {
+            existingAiSection.outerHTML = html;
+          } else {
+            inspectorContent.innerHTML += html;
+          }
+        }
+
         // Render the Goose AI analysis section
         function renderGooseSection() {
           if (!currentGooseInsight) return '';
           
           const insight = currentGooseInsight;
           if (insight.pending) {
+            const statusText = insight.status || 'Generating AI analysis…';
             return '<div class="ai-section" role="status" aria-live="polite">' +
               '<div class="ai-header"><div class="ai-title"><i class="bi bi-robot"></i> AI Security Analysis</div></div>' +
-              '<div class="ai-pending"><span class="ai-spinner" aria-hidden="true"></span><span>Generating AI analysis…</span></div>' +
+              '<div class="ai-pending"><span class="ai-spinner" aria-hidden="true"></span><span>' + escapeHtml(statusText) + '</span></div>' +
               '<div style="margin-top:12px;"><button class="copy-after-btn" data-action="goose-cancel" aria-label="Cancel AI analysis">' +
               '<i class="bi bi-x-circle"></i> Cancel</button></div>' +
               '</div>';
@@ -2382,20 +2558,32 @@ function getWebviewContent(webview) {
           
           // Handle error state
           if (insight.error) {
+            const isNoApiKey = insight.error === 'NO_API_KEY';
+            if (isNoApiKey) {
+              const noKeyHtml = '<div class="ai-section ai-error" role="alert" aria-label="API Key Required">' +
+                '<div class="ai-header"><div class="ai-title"><i class="bi bi-robot"></i> AI Security Analysis</div></div>' +
+                '<div class="ai-content">To generate AI Insights add an API key</div>' +
+                '<button class="copy-after-btn add-api-key-btn" data-action="open-api-key-tab" style="margin-top:12px;">Add API Key</button></div>';
+              insertOrReplaceAiSection(noKeyHtml);
+              return noKeyHtml;
+            }
             const isMissingGoose = (insight.error || '').toLowerCase().includes('goose cli not found');
-        if (isMissingGoose) {
-          return '<div class="ai-section ai-warning" role="alert" aria-label="Goose Setup Required">' +
-            '<div class="ai-header"><i class="bi bi-exclamation-triangle"></i> Goose Setup Required</div>' +
-            '<div class="ai-content">Goose CLI not found.</div>' +
-            '<div class="ai-content" style="margin-top:8px;">' +
-            '<strong>Steps:</strong><br/>1) Install Goose CLI<br/>2) Ensure <code>goose --version</code> works in your terminal<br/>3) Set <code>OPENAI_API_KEY</code> and retry' +
-            '</div>' +
-            '</div>';
-        }
-            return '<div class="ai-section ai-error" role="alert" aria-label="AI Analysis Error">' +
-              '<div class="ai-header"><i class="bi bi-exclamation-triangle"></i> AI Analysis Unavailable</div>' +
+            if (isMissingGoose) {
+              const warningHtml = '<div class="ai-section ai-warning" role="alert" aria-label="Goose Setup Required">' +
+                '<div class="ai-header"><i class="bi bi-exclamation-triangle"></i> Goose Setup Required</div>' +
+                '<div class="ai-content">Goose CLI not found.</div>' +
+                '<div class="ai-content" style="margin-top:8px;">' +
+                '<strong>Steps:</strong><br/>1) Install Goose CLI<br/>2) Ensure <code>goose --version</code> works in your terminal<br/>3) Set <code>OPENAI_API_KEY</code> and retry' +
+                '</div></div>';
+              insertOrReplaceAiSection(warningHtml);
+              return warningHtml;
+            }
+            const errorHtml = '<div class="ai-section ai-error" role="alert" aria-label="AI Analysis Error">' +
+              '<div class="ai-header"><div class="ai-title"><i class="bi bi-robot"></i> AI Security Analysis</div></div>' +
               '<div class="ai-content">' + escapeHtml(insight.error) + '</div>' +
               '</div>';
+            insertOrReplaceAiSection(errorHtml);
+            return errorHtml;
           }
           
           // Handle new enterprise format with validation/analysis/accessibility/metadata structure
@@ -2733,6 +2921,10 @@ function getWebviewContent(webview) {
             }
             case 'goose-cancel': {
               cancelGooseAnalysis();
+              break;
+            }
+            case 'open-api-key-tab': {
+              vscode.postMessage({ command: 'openApiKeySettings' });
               break;
             }
             case 'copy-action': {

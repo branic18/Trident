@@ -37,7 +37,8 @@
     "onView:vulnerabilityView",
     "onCommand:vulnerability-scanner.scan",
     "onCommand:vulnerability-scanner.showLogs",
-    "onCommand:trident.openApiKeySettings"
+    "onCommand:trident.openApiKeySettings",
+    "onCommand:trident.addAiInsights"
   ],
   "contributes": {
     "views": {
@@ -127,7 +128,11 @@
       },
       {
         "command": "trident.openApiKeySettings",
-        "title": "API Key"
+        "title": "API Key Settings"
+      },
+      {
+        "command": "trident.addAiInsights",
+        "title": "Trident | Add AI Insights"
       }
     ]
   },

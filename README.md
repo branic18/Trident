@@ -17,17 +17,17 @@ Trident is a Node.js vulnerability package scanner that helps you automatically 
 ## Where to Start
 
 1. When your canvas generates select the severities in the top left corner to display the severity inspector panel
-2. Take a look at the panel, starting with the first ppackage
-3. Here, as well as with other packages, you can review the remediation details to resolve the package, or click 'View details' to read more information on the vulnerabilities of that package
-4. Within the remediation block, copy the install to your clipboard and paste into the terminal to resolve the package vulnerability
-5. If you entered your API key via the 'Trident | Add AI Insights' command, when you view package details you can view AI-Powered Insights to help you better understand the vulnerabilities of that package
+2. Take a look at the panel, starting with the first package
+3. Within the remediation block for each package, copy the command to your clipboard and paste into the terminal to resolve the package vulnerability
+4. Within the package list you can click 'View details' for a package to read more information on the vulnerabilities of that package
+5. If you entered your API key via the 'Trident | Add AI Insights' command, when you view package details you receieve AI-Powered Insights to help you better understand the vulnerabilities of that package
 
 ## Commands
 
 | Command | Description |
 |--------|-------------|
 | Vulnerability Package Scanner | Generates your visual! |
-| Trident | Add AI Insights | Add your API Key |
+| Trident Add AI Insights | Add your API Key |
 
 ## Screenshots
 

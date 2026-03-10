@@ -9,10 +9,11 @@ Trident is a Node.js vulnerability package scanner that helps you automatically 
 
 ## Setup
 
-1. Install the extension
-2. Expand 'Vulnerable Packages' view 
-3. Run "Run Scanner"
-3. Start resolving vulnerabilities!
+1. Have a Node.js codebase ready. JUDGES ONLY DOWNLOAD TEST CODE HERE [TestCode](https://drive.google.com/file/d/1gD05X24k9gvPGgw2YlcQvPWtM7afBKij/view?usp=sharing) (Optional)
+2. Install the extension
+3. Expand 'Vulnerable Packages' view 
+4. Run "Run Scanner"
+5. Start resolving vulnerabilities!
 
 ## Where to Start
 
@@ -20,7 +21,7 @@ Trident is a Node.js vulnerability package scanner that helps you automatically 
 2. Take a look at the panel, starting with the first package
 3. Within the remediation block for each package, copy the command to your clipboard and paste into the terminal to resolve the package vulnerability
 4. Within the package list you can click 'View details' for a package to read more information on the vulnerabilities of that package
-5. If you entered your API key via the 'Trident | Add AI Insights' command, when you view package details you receieve AI-Powered Insights to help you better understand the vulnerabilities of that package
+5. If you entered your API key via the 'Trident | Add AI Insights' command(palette)(Shift+CMD+P), when you view package details you receieve AI-Powered Insights to help you better understand the vulnerabilities of that package
 
 ## Commands
 

@@ -30,7 +30,14 @@ Trident Vulnerability Package Scanner is a VS Code extension that runs `npm audi
 - **Accessibility‑first, human‑centered design**  
   The UI, AI flows, and copy are built to be readable, keyboard‑friendly, and low‑jargon, so developers of all backgrounds can understand risks and suggested fixes without needing to be security experts or AI specialists.
 
+======================================
 
+## 🚨 Important Things To Know 🚨
+
+Install version 1.3.5 from [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=TridentTeam.trident-vulnerability-package-scanner&ssr=false#overview)- this is the latest version. When you download the extension make sure to click the dropdown next to 'Uninstall' then select 'Install specific version...' and select '1.3.5'
+- If you install this version you won't need to follow the Goose Setup below to add AI Insights, instead you can open the Command Palette and type and select 'Trident Add AI Insights', then follow the instructions to add AI Insights
+
+======================================
 
 ## 🚀 Quick Start & Demo Path
 
@@ -44,6 +51,8 @@ Development
 7. Make sure the new window has a Node.js project
 8. Select 'Start Scanner' under the 'Vulnerable Packages' view under 'Explorer'
 9. This should open the canvas!
+
+Privacy Note: VSCode Secret Storage is used to securely store the API Key
 
 ## 🤖 Goose Setup (User-Configured)
 🤖 Goose Setup (User-Configured)

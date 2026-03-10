@@ -36,6 +36,7 @@ Trident Vulnerability Package Scanner is a VS Code extension that runs `npm audi
 
 Install version 1.3.5 from [VSCode Marketplace](https://marketplace.visualstudio.com/items?itemName=TridentTeam.trident-vulnerability-package-scanner&ssr=false#overview)- this is the latest version. When you download the extension make sure to click the dropdown next to 'Uninstall' then select 'Install specific version...' and select '1.3.5'
 - If you install this version you won't need to follow the Goose Setup below to add AI Insights, instead you can open the Command Palette and type and select 'Trident Add AI Insights', then follow the instructions to add AI Insights
+- NOTE: AI Insights make take 20-30 seconds to generate
 
 ======================================
 

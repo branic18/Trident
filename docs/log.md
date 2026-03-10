@@ -1,1 +1,0 @@
-npm audit failed: npm error code ENOLOCK npm error audit This command requires an existing lockfile. npm error audit Try creating one first with: npm i --package-lock-only npm error audit Original error: loadVirtual requires existing shrinkwrap file npm error A complete log of this run can be found in: /Users/brandi/.npm/_logs/2026-03-03T03_03_54_636Z-debug-0.log

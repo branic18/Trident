@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.6](https://github.com/branic18/Trident/compare/v1.3.5...v1.3.6) (2026-03-10)
+
+
+### Bug Fixes
+
+* Fixed typos and refined Getting Started instructions for the marketplace overview ([430e316](https://github.com/branic18/Trident/commit/430e316d5df5f5f34a9e5d5169f08812cd03e4eb))
+* Raise dev summary limit, fix OpenRouter UI copy, and align error header ([a1a4f08](https://github.com/branic18/Trident/commit/a1a4f08c5fe8a24fab9557c37e0a1f8da55dea79))
+
 ## [1.3.5](https://github.com/branic18/Trident/compare/v1.3.4...v1.3.5) (2026-03-09)
 
 
